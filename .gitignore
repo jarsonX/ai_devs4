@@ -1,3 +1,5 @@
+course_materials/
+data/
 venv/
 .env
 __pycache__/

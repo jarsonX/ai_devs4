@@ -17,12 +17,14 @@ Each task from the course is implemented in a separate directory.
 
 This repository **does not contain any course materials** that would allow someone to complete the AI_devs course without participating in it.
 
-The repository contains **only my own code and solutions** created while working through the course tasks.
+The repository contains **code created while working through the course tasks**.
 
-Before publishing any code to this repository:
+To respect the course rules and good development practices:
 
-- all **API keys and secrets are removed**,  
-- any **answers submitted to the course platform are removed**,  
-- no **original course content or datasets** are included.
+- **no API keys or secrets are included** in the repository (they are managed via environment variables),
+- **answers submitted to the course platform are not published**,
+- **no original course content or datasets** are included.
+
+Some solutions may be inspired by publicly discussed approaches within the course community or by examples provided during the course.
 
 The repository is intended purely for educational and portfolio purposes.
