@@ -14,17 +14,6 @@ ALLOWED_TAGS = [
 ]
 
 
-#TAG_DESCRIPTIONS = {
-#    "IT": "Praca związana z technologią, oprogramowaniem, systemami komputerowymi lub analizą danych.",
-#    "transport": "Praca związana z przewozem osób lub towarów, logistyką, spedycją albo organizacją transportu.",
-#    "edukacja": "Praca związana z nauczaniem, szkoleniami lub przekazywaniem wiedzy.",
-#    "medycyna": "Praca związana z ochroną zdrowia, leczeniem, diagnostyką lub opieką medyczną.",
-#    "praca z ludźmi": "Praca, w której kluczowym elementem jest bezpośrednia interakcja z ludźmi, klientami, pacjentami, uczniami lub zespołem.",
-#    "praca z pojazdami": "Praca wymagająca prowadzenia, obsługi, naprawy lub bezpośredniej pracy przy pojazdach.",
-#    "praca fizyczna": "Praca wymagająca głównie wysiłku fizycznego, pracy manualnej lub terenowej.",
-#}
-
-
 TAG_DESCRIPTIONS = {
     "IT": "Work directly related to software, programming, computer systems, IT infrastructure, cybersecurity, data engineering, data analysis, or administering digital systems. Do not use this tag for general technical, scientific, industrial, electrical, mechanical, or research work unless the description clearly involves computing or information systems.",
     "transport": "Work directly related to transporting people or goods, logistics, freight, shipping, dispatching, route planning, fleet operations, warehouse flow, or coordination of movement of goods.",
@@ -91,8 +80,6 @@ Examples:
 Input job descriptions:
 {jobs_block}
 
-Return the result as plain text using this exact format:
-1: tag1, tag2
-2: tag3
-3:
+Return a JSON response that matches the provided schema exactly.
+Do not add explanations or any text outside the JSON output.
 """.strip()
