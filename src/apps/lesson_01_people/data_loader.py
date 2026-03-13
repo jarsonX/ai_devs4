@@ -11,7 +11,7 @@ from .models import PersonRecord
 
 
 def build_people_csv_url(config: AppConfig) -> str:
-    return f"{config.hub_base_url}/data/{config.api_key}/people.csv"
+    return f"{config.hub_base_url}/data/{config.ai_devs_api_key}/people.csv"
 
 
 def ensure_input_directory(path: Path) -> None:
