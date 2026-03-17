@@ -33,7 +33,7 @@ def get_config() -> AppConfig:
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY is missing.")    
     
-    data_dir = Path("data") / "lesson_01_people"
+    data_dir = Path("data") / "L01_people"
     input_dir = data_dir / "input"
     input_csv_path = input_dir / "people.csv"
     output_dir = data_dir / "output"
