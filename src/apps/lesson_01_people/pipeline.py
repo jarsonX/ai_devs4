@@ -7,6 +7,7 @@ from .config import get_config, AppConfig
 from .data_loader import download_people_csv, load_people
 from .filters import filter_people_for_transport_check
 from .models import PersonRecord, JobClassificationResponse
+from .output import save_verification_result
 
 
 def select_transport_people(
@@ -90,3 +91,17 @@ def run_pipeline() -> None:
 
     print("\nVerification result:")
     print(verification_result)
+
+    # Save results to file
+    statistics = {
+        "total_records": len(people),
+        "records_after_filtering": len(filtered_people),
+        "transport_related_count": len(transport_people),
+    }
+    output_path = save_verification_result(
+        config.output_json_path,
+        payload,
+        verification_result,
+        statistics,
+    )
+    print(f"\nResults saved to: {output_path}")

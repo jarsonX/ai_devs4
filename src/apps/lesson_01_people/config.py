@@ -20,6 +20,8 @@ class AppConfig:
     data_dir: Path
     input_dir: Path
     input_csv_path: Path
+    output_dir: Path
+    output_json_path: Path
 
 
 def get_config() -> AppConfig:
@@ -34,6 +36,8 @@ def get_config() -> AppConfig:
     data_dir = Path("data") / "lesson_01_people"
     input_dir = data_dir / "input"
     input_csv_path = input_dir / "people.csv"
+    output_dir = data_dir / "output"
+    output_json_path = output_dir / "verification_result.json"
 
     return AppConfig(
         ai_devs_api_key=ai_devs_api_key,
@@ -43,5 +47,7 @@ def get_config() -> AppConfig:
         openai_model="gpt-4.1-mini",
         data_dir=data_dir,
         input_dir=input_dir,
-        input_csv_path=input_csv_path
+        input_csv_path=input_csv_path,
+        output_dir=output_dir,
+        output_json_path=output_json_path
     )
