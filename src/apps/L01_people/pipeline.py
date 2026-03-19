@@ -56,9 +56,7 @@ def build_answer_payload(
 
 
 def send_answer(config: AppConfig, payload: dict) -> dict:
-    verify_url = "URL_REDACTED"
-
-    response = requests.post(verify_url, json=payload, timeout=30)
+    response = requests.post(config.verify_api_url, json=payload, timeout=30)
     response.raise_for_status()
 
     return response.json()

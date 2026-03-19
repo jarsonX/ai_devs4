@@ -10,10 +10,6 @@ from .config import AppConfig
 from .models import PersonRecord
 
 
-def build_people_csv_url(config: AppConfig) -> str:
-    return "URL_REDACTED"
-
-
 def ensure_input_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
@@ -21,8 +17,7 @@ def ensure_input_directory(path: Path) -> None:
 def download_people_csv(config: AppConfig, timeout: int = 30) -> Path:
     ensure_input_directory(config.input_dir)
 
-    url = build_people_csv_url(config)
-    response = requests.get(url, timeout=timeout)
+    response = requests.get(config.people_csv_url, timeout=timeout)
     response.raise_for_status()
 
     config.input_csv_path.write_bytes(response.content)

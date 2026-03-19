@@ -15,7 +15,8 @@ class AppConfig:
     ai_devs_api_key: str
     openai_api_key: str
     task_name: str
-    hub_base_url: str
+    people_csv_url: str
+    verify_api_url: str
     openai_model: str
     data_dir: Path
     input_dir: Path
@@ -24,15 +25,15 @@ class AppConfig:
     output_json_path: Path
 
 
-def get_config() -> AppConfig:
-    ai_devs_api_key = os.getenv("AI_DEVS_API_KEY", "").strip()
-    if not ai_devs_api_key:
-        raise ValueError("AI_DEVS_API_KEY is missing.")
+def get_required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise ValueError(f"{name} is missing.")
 
-    openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not openai_api_key:
-        raise ValueError("OPENAI_API_KEY is missing.")    
-    
+    return value
+
+
+def get_config() -> AppConfig:
     data_dir = Path("data") / "L01_people"
     input_dir = data_dir / "input"
     input_csv_path = input_dir / "people.csv"
@@ -40,10 +41,11 @@ def get_config() -> AppConfig:
     output_json_path = output_dir / "verification_result.json"
 
     return AppConfig(
-        ai_devs_api_key=ai_devs_api_key,
-        openai_api_key=openai_api_key,
+        ai_devs_api_key=get_required_env("AI_DEVS_API_KEY"),
+        openai_api_key=get_required_env("OPENAI_API_KEY"),
         task_name="people",
-        hub_base_url="URL_REDACTED",
+        people_csv_url=get_required_env("L01_PEOPLE_CSV_URL"),
+        verify_api_url=get_required_env("L01_VERIFY_API_URL"),
         openai_model="gpt-4.1-mini",
         data_dir=data_dir,
         input_dir=input_dir,
