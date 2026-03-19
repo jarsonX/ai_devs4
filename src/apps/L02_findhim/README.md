@@ -26,5 +26,6 @@ This app solves the AI_devs `findhim` task using an agent with OpenAI Function C
 ### Notes
 
 - Secrets and private endpoints are loaded from `.env`.
-- The agent orchestrates the workflow, but calculations and API handling stay deterministic in Python.
+- The agent orchestrates the workflow in stages (`setup`, `ranking`, `finalize`) and only sees the tools needed in the current stage.
+- Calculations and API handling stay deterministic in Python.
 - `workbench/` contains exploration scripts used during development.

@@ -8,7 +8,24 @@ from .city_resolver import resolve_city_coordinates
 from .config import AppConfig
 from .data_loader import load_suspects
 from .distance import find_best_distance_for_suspect
-from .models import PersonLocation, PowerPlantCity, Suspect, VerificationAnswer
+from .models import PowerPlantCity, Suspect, VerificationAnswer
+
+
+TOOL_STAGE_GROUPS = {
+    "setup": [
+        "get_suspects",
+        "get_power_plants",
+        "resolve_power_plant_city_coordinates",
+        "combine_power_plants_with_coordinates",
+    ],
+    "ranking": [
+        "rank_suspects_by_distance",
+    ],
+    "finalize": [
+        "get_access_level",
+        "build_verification_answer",
+    ],
+}
 
 
 def serialize_suspects(suspects: list) -> list[dict[str, Any]]:
@@ -44,16 +61,6 @@ def serialize_city_coordinates(coordinates: list) -> list[dict[str, Any]]:
             "longitude": item.longitude,
         }
         for item in coordinates
-    ]
-
-
-def serialize_locations(locations: list) -> list[dict[str, Any]]:
-    return [
-        {
-            "latitude": location.latitude,
-            "longitude": location.longitude,
-        }
-        for location in locations
     ]
 
 
@@ -96,8 +103,8 @@ def sort_candidate_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]
     )
 
 
-def build_tool_definitions() -> list[dict]:
-    return [
+def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict]:
+    tool_definitions = [
         {
             "type": "function",
             "name": "get_suspects",
@@ -144,20 +151,6 @@ def build_tool_definitions() -> list[dict]:
         },
         {
             "type": "function",
-            "name": "get_person_locations",
-            "description": "Fetch observed locations for one suspect.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "surname": {"type": "string"},
-                },
-                "required": ["name", "surname"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
             "name": "combine_power_plants_with_coordinates",
             "description": (
                 "Combine power plant records with resolved city coordinates by normalized city name."
@@ -196,57 +189,6 @@ def build_tool_definitions() -> list[dict]:
                     },
                 },
                 "required": ["powerPlants", "cityCoordinates"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
-            "name": "find_best_distance_match",
-            "description": (
-                "Find the shortest distance between one suspect's observed locations and the power plant cities."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "suspect": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "surname": {"type": "string"},
-                            "birthYear": {"type": "integer"},
-                        },
-                        "required": ["name", "surname", "birthYear"],
-                        "additionalProperties": False,
-                    },
-                    "locations": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "latitude": {"type": "number"},
-                                "longitude": {"type": "number"},
-                            },
-                            "required": ["latitude", "longitude"],
-                            "additionalProperties": False,
-                        },
-                    },
-                    "powerPlantCities": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "city": {"type": "string"},
-                                "normalizedCity": {"type": "string"},
-                                "code": {"type": "string"},
-                                "latitude": {"type": "number"},
-                                "longitude": {"type": "number"},
-                            },
-                            "required": ["city", "normalizedCity", "code", "latitude", "longitude"],
-                            "additionalProperties": False,
-                        },
-                    },
-                },
-                "required": ["suspect", "locations", "powerPlantCities"],
                 "additionalProperties": False,
             },
         },
@@ -332,6 +274,16 @@ def build_tool_definitions() -> list[dict]:
         },
     ]
 
+    if allowed_names is None:
+        return tool_definitions
+
+    allowed_name_set = set(allowed_names)
+    return [
+        tool_definition
+        for tool_definition in tool_definitions
+        if tool_definition["name"] in allowed_name_set
+    ]
+
 
 class FindHimToolbox:
     def __init__(self, config: AppConfig) -> None:
@@ -354,12 +306,6 @@ class FindHimToolbox:
         coordinates = resolve_city_coordinates(self.config, cities)
         return {
             "cityCoordinates": serialize_city_coordinates(coordinates),
-        }
-
-    def get_person_locations(self, name: str, surname: str) -> dict[str, Any]:
-        locations = self.api_client.get_person_locations(name, surname)
-        return {
-            "locations": serialize_locations(locations),
         }
 
     def combine_power_plants_with_coordinates(
@@ -410,44 +356,6 @@ class FindHimToolbox:
 
         return {
             "powerPlantCities": serialize_power_plant_cities(combined),
-        }
-
-    def find_best_distance_match(
-        self,
-        suspect_data: dict[str, Any],
-        locations_data: list[dict[str, Any]],
-        power_plant_cities_data: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        suspect = Suspect(
-            name=str(suspect_data["name"]).strip(),
-            surname=str(suspect_data["surname"]).strip(),
-            birth_year=int(suspect_data["birthYear"]),
-        )
-        locations = [
-            PersonLocation(
-                latitude=float(item["latitude"]),
-                longitude=float(item["longitude"]),
-            )
-            for item in locations_data
-        ]
-        power_plant_cities = [
-            PowerPlantCity(
-                city=str(item["city"]).strip(),
-                normalized_city=str(item["normalizedCity"]).strip(),
-                code=str(item["code"]).strip(),
-                latitude=float(item["latitude"]),
-                longitude=float(item["longitude"]),
-            )
-            for item in power_plant_cities_data
-        ]
-
-        candidate_distance = find_best_distance_for_suspect(
-            suspect=suspect,
-            locations=locations,
-            power_plant_cities=power_plant_cities,
-        )
-        return {
-            "bestMatch": serialize_candidate_distance(candidate_distance),
         }
 
     def get_access_level(self, name: str, surname: str, birth_year: int) -> dict[str, Any]:
@@ -539,14 +447,6 @@ class FindHimToolbox:
 
             return self.resolve_power_plant_city_coordinates(cities)
 
-        if tool_name == "get_person_locations":
-            name = arguments.get("name")
-            surname = arguments.get("surname")
-            if not isinstance(name, str) or not isinstance(surname, str):
-                raise ValueError("Tool get_person_locations requires string fields 'name' and 'surname'.")
-
-            return self.get_person_locations(name, surname)
-
         if tool_name == "combine_power_plants_with_coordinates":
             power_plants = arguments.get("powerPlants")
             city_coordinates = arguments.get("cityCoordinates")
@@ -557,20 +457,6 @@ class FindHimToolbox:
                 )
 
             return self.combine_power_plants_with_coordinates(power_plants, city_coordinates)
-
-        if tool_name == "find_best_distance_match":
-            suspect = arguments.get("suspect")
-            locations = arguments.get("locations")
-            power_plant_cities = arguments.get("powerPlantCities")
-            if not isinstance(suspect, dict) or not isinstance(locations, list) or not isinstance(
-                power_plant_cities, list
-            ):
-                raise ValueError(
-                    "Tool find_best_distance_match requires 'suspect', 'locations', and "
-                    "'powerPlantCities' arguments."
-                )
-
-            return self.find_best_distance_match(suspect, locations, power_plant_cities)
 
         if tool_name == "get_access_level":
             name = arguments.get("name")
