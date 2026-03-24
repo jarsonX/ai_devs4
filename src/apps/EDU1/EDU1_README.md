@@ -86,6 +86,272 @@ The current design keeps responsibilities narrow:
 
 This split keeps the agent useful without making it responsible for the entire business flow.
 
+## Planned Tools
+
+The current tool plan contains 7 tools grouped by workflow stage.
+
+### Setup Tools
+
+- `load_people_data`
+  Loads the raw JSON object from `data/EDU1/data_people.json`.
+- `extract_people_payload`
+  Extracts `payload_sent.answer` and returns a clean list of people records.
+- `extract_unique_cities`
+  Collects the unique city names from the people list.
+
+### Selection Tools
+
+- `validate_selected_city`
+  Checks whether the city selected by the model exists in the provided city list.
+- `find_person_by_city`
+  Returns the single person assigned to the selected city.
+
+### Finalize Tools
+
+- `get_access_level`
+  Fetches `accessLevel` for the selected person from the AI_devs API.
+- `build_final_result`
+  Builds the final business result object.
+
+## Tool Exposure Strategy
+
+The agent should not see all tools at once.
+Instead, each stage should expose only the tools needed for that stage:
+
+- `setup`: `load_people_data`, `extract_people_payload`, `extract_unique_cities`
+- `selection`: `validate_selected_city`, `find_person_by_city`
+- `finalize`: `get_access_level`, `build_final_result`
+
+This follows the learning goal taken from `L02_findhim`:
+- keep the workflow staged,
+- reduce unnecessary tool choices,
+- make each step easier to understand and debug.
+
+## Planned Agent State
+
+The current plan uses a small shared runtime state.
+The state should contain only the values needed to move between stages:
+
+- `rawData`
+- `people`
+- `cities`
+- `selectedCity`
+- `selectedPerson`
+- `accessLevel`
+- `result`
+
+Each field represents one important milestone in the workflow.
+
+## Stage Completion Rules
+
+The current stage completion conditions are:
+
+- `setup` is complete when `rawData`, `people`, and `cities` exist in state.
+- `selection` is complete when `selectedCity` and `selectedPerson` exist in state.
+- `finalize` is complete when `accessLevel` and `result` exist in state.
+
+This keeps stage transitions explicit and easy to debug.
+
+## Selected City Validation Rule
+
+The model may propose a city during the `selection` stage, but the application should treat that value as untrusted until it is validated.
+
+The agreed rule is:
+- the raw model choice may appear in the transcript or debug log,
+- `selectedCity` should be written to application state only after `validate_selected_city` confirms that the value belongs to the provided city list.
+
+This keeps the runtime state limited to validated business data.
+
+## Planned Stage Flow
+
+The current high-level flow is:
+
+1. `setup`
+   - load raw data
+   - extract people
+   - extract cities
+2. `selection`
+   - let the model choose a city from the closed list
+   - validate the chosen city
+   - find the matching person
+3. `finalize`
+   - fetch `accessLevel`
+   - build the final result
+
+This preserves the staged-agent pattern from `L02_findhim` in a simpler form.
+
+## Planned File Structure
+
+The current recommended file structure is:
+
+- `EDU1_README.md`
+  Project notes and design decisions.
+- `main.py`
+  Thin application entrypoint. It should call the pipeline runner.
+- `pipeline.py`
+  End-to-end application flow.
+- `agent.py`
+  Staged agent loop, tool exposure per stage, and runtime state handling.
+- `tools.py`
+  Tool definitions and deterministic tool execution.
+- `config.py`
+  Application configuration, paths, model name, and API settings.
+- `models.py`
+  Small data models used across the app.
+- `data_loader.py`
+  Local JSON loading and payload extraction logic.
+- `api_client.py`
+  AI_devs API integration for `accessLevel`.
+
+The agreed entrypoint is `main.py`.
+`pipeline.py` should still contain the main end-to-end flow, while `main.py` remains a thin wrapper.
+
+## File Responsibilities
+
+The current responsibility split is:
+
+- `main.py`
+  Thin entrypoint. It should only start the pipeline.
+- `pipeline.py`
+  High-level end-to-end flow. It should load config, run the agent, and return or print the final result.
+- `agent.py`
+  Agent orchestration. It should define stages, prompts, tool exposure, runtime state, and stage transitions.
+- `tools.py`
+  Tool definitions and tool execution. It should expose deterministic operations to the model and dispatch calls to application code.
+- `data_loader.py`
+  Local file input logic. It should load `data_people.json`, extract `payload_sent.answer`, validate the structure, and prepare clean people data.
+- `api_client.py`
+  AI_devs integration. It should fetch `accessLevel` and validate the basic response shape.
+- `models.py`
+  Small shared data models.
+- `config.py`
+  Application settings such as paths, API keys, model name, URLs, and iteration limits.
+
+## Boundary Rules
+
+The current design should keep these boundaries clear:
+
+- `main.py` should not contain business logic.
+- `pipeline.py` should not contain detailed tool logic or prompt logic.
+- `agent.py` should orchestrate, not directly read files or call AI_devs endpoints.
+- `tools.py` should execute operations, not control stage transitions.
+- `data_loader.py` should handle local data only.
+- `api_client.py` should handle remote API access only.
+
+Prompts, stage order, and stage-specific instructions should live in `agent.py`.
+
+## Planned Internal Contents
+
+The current plan for each file is:
+
+- `models.py`
+  Should define small shared models such as `Person` and `FinalResult`.
+- `config.py`
+  Should define `AppConfig` and `get_config()`.
+- `data_loader.py`
+  Should contain local JSON loading, payload extraction, and city extraction logic.
+- `api_client.py`
+  Should contain the AI_devs client used to fetch `accessLevel`.
+- `tools.py`
+  Should contain tool stage groups, tool definitions, the toolbox class, and tool dispatch logic.
+- `agent.py`
+  Should contain stage order, prompts, stage completion checks, state updates, and the main agent loop.
+- `pipeline.py`
+  Should contain `run_pipeline()`.
+- `main.py`
+  Should contain `main()` and a standard `if __name__ == "__main__"` entry block.
+
+## Planned Functions And Contracts
+
+### `models.py`
+
+- `Person`
+  Fields: `name`, `surname`, `birth_year`, `city`
+- `FinalResult`
+  Fields: `selected_city`, `person`, `access_level`
+
+### `config.py`
+
+- `get_config() -> AppConfig`
+  Returns the full application configuration.
+  It should fail clearly when required settings are missing.
+
+### `data_loader.py`
+
+- `load_people_data(path: Path) -> dict[str, Any]`
+  Loads the raw JSON object from disk.
+- `extract_people_payload(raw_data: dict[str, Any]) -> list[Person]`
+  Extracts and validates `payload_sent.answer`.
+- `extract_unique_cities(people: list[Person]) -> list[str]`
+  Returns unique city names, preferably in a stable order.
+
+### `api_client.py`
+
+- `Edu1ApiClient.get_access_level(name: str, surname: str, birth_year: int) -> int`
+  Fetches and validates `accessLevel` from AI_devs.
+
+### `tools.py`
+
+- `build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[str, Any]]`
+  Builds the tool definitions exposed to the model.
+- `Edu1Toolbox.load_people_data() -> dict[str, Any]`
+  Returns `{"rawData": ...}`.
+- `Edu1Toolbox.extract_people_payload(raw_data: dict[str, Any]) -> dict[str, Any]`
+  Returns `{"people": [...]}`.
+- `Edu1Toolbox.extract_unique_cities(people: list[dict[str, Any]]) -> dict[str, Any]`
+  Returns `{"cities": [...]}`.
+- `Edu1Toolbox.validate_selected_city(selected_city: str, available_cities: list[str]) -> dict[str, Any]`
+  Returns `{"isValid": bool, "selectedCity": str | None}`.
+- `Edu1Toolbox.find_person_by_city(people: list[dict[str, Any]], city: str) -> dict[str, Any]`
+  Returns `{"selectedPerson": {...}}`.
+- `Edu1Toolbox.get_access_level(name: str, surname: str, birth_year: int) -> dict[str, Any]`
+  Returns `{"accessLevel": int}`.
+- `Edu1Toolbox.build_final_result(person: dict[str, Any], selected_city: str, access_level: int) -> dict[str, Any]`
+  Returns `{"result": {...}}`.
+- `Edu1Toolbox.execute(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]`
+  Dispatches one tool call to the correct implementation.
+
+### `agent.py`
+
+- `is_stage_complete(stage_name: str, state: dict[str, Any]) -> bool`
+  Checks whether a stage has produced its required state values.
+- `extract_function_calls(response: Any) -> list[Any]`
+  Extracts tool calls from the OpenAI response.
+- `update_state_from_result(state: dict[str, Any], tool_name: str, result: dict[str, Any]) -> None`
+  Updates runtime state with validated tool results.
+- `build_stage_input(stage_name: str, state: dict[str, Any], is_first_stage: bool) -> list[dict[str, str]]`
+  Builds the model input for the current stage.
+- `execute_tool_calls(...) -> list[dict[str, str]]`
+  Executes requested tools and returns tool outputs to the model.
+- `run_agent(config: AppConfig) -> dict[str, Any]`
+  Runs the full staged agent workflow and returns the final result.
+
+### `pipeline.py`
+
+- `run_pipeline() -> dict[str, Any]`
+  Loads config, runs the agent, and returns the final result.
+
+### `main.py`
+
+- `main() -> None`
+  Starts the application by calling `run_pipeline()`.
+
+## Validation And Error Rules
+
+The current agreed validation rules are:
+
+- `payload_sent.answer` must exist and must be a list.
+- Person records must contain the required fields.
+- The model-selected city must be one of the provided cities.
+- `selectedCity` should enter runtime state only after successful validation.
+- `find_person_by_city` should fail when there is no match or more than one match.
+- `get_access_level` should fail clearly when the API response shape is invalid.
+
+## Serialization Rule
+
+Inside domain-oriented code, shared models may be used for clarity.
+At the tool boundary, data returned to the model should be JSON-serializable dictionaries and lists.
+
 ## Assumptions
 
 - `data_people.json` contains metadata, but only `payload_sent.answer` matters for business logic.
@@ -96,4 +362,4 @@ This split keeps the agent useful without making it responsible for the entire b
 ## Status
 
 This README documents the current agreed direction for EDU1.
-Implementation details, module structure, and tool definitions are still to be designed.
+Exact implementation details inside each file are still to be designed.
