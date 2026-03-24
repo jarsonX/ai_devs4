@@ -1,3 +1,5 @@
+"""This file saves run results to disk and hides sensitive values before writing them to JSON."""
+
 from __future__ import annotations
 
 import json

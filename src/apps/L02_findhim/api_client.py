@@ -1,3 +1,5 @@
+"""This file talks to the course APIs and turns raw HTTP responses into clean Python data."""
+
 from __future__ import annotations
 
 import json

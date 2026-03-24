@@ -1,3 +1,5 @@
+"""This file calculates geographic distances and finds which power plant is closest to a suspect."""
+
 from __future__ import annotations
 
 from math import asin, cos, radians, sin, sqrt

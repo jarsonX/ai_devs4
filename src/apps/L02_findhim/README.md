@@ -1,3 +1,5 @@
+<!-- This file gives a quick overview of what the FindHim app does and which modules are responsible for each part. -->
+
 ## L02 FindHim
 
 This app solves the AI_devs `findhim` task using an agent with OpenAI Function Calling.

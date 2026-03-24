@@ -1,3 +1,5 @@
+"""This file checks whether the agent result is complete, consistent, and safe to verify."""
+
 from __future__ import annotations
 
 import re

@@ -1,3 +1,5 @@
+"""This file asks OpenAI for representative coordinates of power plant cities in Poland."""
+
 from __future__ import annotations
 
 import json

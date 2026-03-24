@@ -1,3 +1,5 @@
+"""This file defines the tools the agent can use and contains the Python logic behind each tool."""
+
 from __future__ import annotations
 
 import re

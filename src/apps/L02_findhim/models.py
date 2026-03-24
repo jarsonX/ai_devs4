@@ -1,3 +1,5 @@
+"""This file keeps the small data models used across the app, like suspects, plants, and answers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

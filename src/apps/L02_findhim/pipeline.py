@@ -1,3 +1,5 @@
+"""This file connects all main steps: run the agent, validate the result, and send it for verification."""
+
 from __future__ import annotations
 
 from .agent import run_agent

@@ -1,3 +1,5 @@
+"""This file loads app settings such as API keys, URLs, paths, and model configuration."""
+
 from __future__ import annotations
 
 import os

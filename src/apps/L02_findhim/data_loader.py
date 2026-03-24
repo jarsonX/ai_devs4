@@ -1,3 +1,5 @@
+"""This file loads suspects from saved JSON files and converts them into simple Python objects."""
+
 from __future__ import annotations
 
 import json
