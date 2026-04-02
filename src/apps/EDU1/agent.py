@@ -10,6 +10,11 @@ from .tools import Edu1Toolbox, TOOL_STAGE_GROUPS, build_tool_definitions
 
 
 AGENT_STAGE_SEQUENCE = ["selection", "finalize"]
+STAGE_LABELS = {
+    "setup": "1/3",
+    "selection": "2/3",
+    "finalize": "3/3",
+}
 
 
 SYSTEM_PROMPT = """
@@ -66,6 +71,155 @@ Stop after build_final_result succeeds.
 }
 
 
+def log_event(message: str) -> None:
+    print(f"[EDU1] {message}")
+
+
+def summarize_raw_data(raw_data: dict[str, Any]) -> dict[str, Any]:
+    payload_sent = raw_data.get("payload_sent")
+    answer = payload_sent.get("answer") if isinstance(payload_sent, dict) else None
+
+    return {
+        "topLevelKeys": sorted(raw_data.keys()),
+        "payloadSentKeys": sorted(payload_sent.keys()) if isinstance(payload_sent, dict) else [],
+        "answerCount": len(answer) if isinstance(answer, list) else None,
+    }
+
+
+def summarize_person_data(person_data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": person_data.get("name"),
+        "surname": person_data.get("surname"),
+        "birthYear": person_data.get("birthYear"),
+        "city": person_data.get("city"),
+    }
+
+
+def summarize_result_data(result_data: dict[str, Any]) -> dict[str, Any]:
+    person = result_data.get("person")
+
+    return {
+        "selectedCity": result_data.get("selectedCity"),
+        "person": summarize_person_data(person) if isinstance(person, dict) else None,
+        "accessLevel": result_data.get("accessLevel"),
+    }
+
+
+def summarize_state(state: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
+
+    if "rawData" in state and isinstance(state["rawData"], dict):
+        summary["rawData"] = summarize_raw_data(state["rawData"])
+    if "people" in state and isinstance(state["people"], list):
+        summary["peopleCount"] = len(state["people"])
+    if "cities" in state and isinstance(state["cities"], list):
+        summary["cities"] = state["cities"]
+    if "selectedCity" in state:
+        summary["selectedCity"] = state["selectedCity"]
+    if "selectedPerson" in state and isinstance(state["selectedPerson"], dict):
+        summary["selectedPerson"] = summarize_person_data(state["selectedPerson"])
+    if "accessLevel" in state:
+        summary["accessLevel"] = state["accessLevel"]
+    if "result" in state and isinstance(state["result"], dict):
+        summary["result"] = summarize_result_data(state["result"])
+
+    return summary
+
+
+def summarize_tool_arguments(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if tool_name == "load_people_data":
+        return {}
+
+    if tool_name == "extract_people_payload":
+        raw_data = arguments.get("rawData")
+        return {
+            "rawData": summarize_raw_data(raw_data) if isinstance(raw_data, dict) else "<missing>",
+        }
+
+    if tool_name == "extract_unique_cities":
+        people = arguments.get("people")
+        return {
+            "peopleCount": len(people) if isinstance(people, list) else "<invalid>",
+        }
+
+    if tool_name == "validate_selected_city":
+        available_cities = arguments.get("availableCities")
+        return {
+            "selectedCity": arguments.get("selectedCity"),
+            "availableCitiesCount": len(available_cities) if isinstance(available_cities, list) else "<invalid>",
+        }
+
+    if tool_name == "find_person_by_city":
+        people = arguments.get("people")
+        return {
+            "city": arguments.get("city"),
+            "peopleCount": len(people) if isinstance(people, list) else "<invalid>",
+        }
+
+    if tool_name == "get_access_level":
+        return {
+            "name": arguments.get("name"),
+            "surname": arguments.get("surname"),
+            "birthYear": arguments.get("birthYear"),
+        }
+
+    if tool_name == "build_final_result":
+        person = arguments.get("person")
+        return {
+            "selectedCity": arguments.get("selectedCity"),
+            "accessLevel": arguments.get("accessLevel"),
+            "person": summarize_person_data(person) if isinstance(person, dict) else "<invalid>",
+        }
+
+    return {"argumentsKeys": sorted(arguments.keys())}
+
+
+def summarize_tool_result(tool_name: str, result: dict[str, Any]) -> dict[str, Any]:
+    if "error" in result:
+        return {"error": result["error"]}
+
+    if tool_name == "load_people_data":
+        return {
+            "rawData": summarize_raw_data(result["rawData"]),
+        }
+
+    if tool_name == "extract_people_payload":
+        people = result.get("people")
+        return {
+            "peopleCount": len(people) if isinstance(people, list) else "<invalid>",
+        }
+
+    if tool_name == "extract_unique_cities":
+        return {
+            "cities": result.get("cities"),
+        }
+
+    if tool_name == "validate_selected_city":
+        return {
+            "isValid": result.get("isValid"),
+            "selectedCity": result.get("selectedCity"),
+        }
+
+    if tool_name == "find_person_by_city":
+        person = result.get("selectedPerson")
+        return {
+            "selectedPerson": summarize_person_data(person) if isinstance(person, dict) else "<invalid>",
+        }
+
+    if tool_name == "get_access_level":
+        return {
+            "accessLevel": result.get("accessLevel"),
+        }
+
+    if tool_name == "build_final_result":
+        result_data = result.get("result")
+        return {
+            "result": summarize_result_data(result_data) if isinstance(result_data, dict) else "<invalid>",
+        }
+
+    return {"resultKeys": sorted(result.keys())}
+
+
 def extract_function_calls(response: Any) -> list[Any]:
     return [
         item
@@ -120,14 +274,44 @@ def is_stage_complete(stage_name: str, state: dict[str, Any]) -> bool:
 
 
 def run_deterministic_setup(toolbox: Edu1Toolbox, state: dict[str, Any]) -> None:
-    setup_result = toolbox.load_people_data()
-    update_state_from_result(state, "load_people_data", setup_result)
+    log_event(f"Stage {STAGE_LABELS['setup']} setup started")
 
-    people_result = toolbox.extract_people_payload(state["rawData"])
-    update_state_from_result(state, "extract_people_payload", people_result)
+    setup_steps = [
+        ("load_people_data", {}, lambda: toolbox.load_people_data()),
+        (
+            "extract_people_payload",
+            lambda: {"rawData": state["rawData"]},
+            lambda: toolbox.extract_people_payload(state["rawData"]),
+        ),
+        (
+            "extract_unique_cities",
+            lambda: {"people": state["people"]},
+            lambda: toolbox.extract_unique_cities(state["people"]),
+        ),
+    ]
 
-    cities_result = toolbox.extract_unique_cities(state["people"])
-    update_state_from_result(state, "extract_unique_cities", cities_result)
+    for step_index, (tool_name, arguments_source, action) in enumerate(setup_steps, start=1):
+        arguments = arguments_source() if callable(arguments_source) else arguments_source
+        log_event(
+            f"Stage {STAGE_LABELS['setup']} setup | Step {step_index} | Tool {tool_name}"
+        )
+        log_event(
+            "Tool arguments: "
+            + json.dumps(summarize_tool_arguments(tool_name, arguments), ensure_ascii=False)
+        )
+
+        result = action()
+        update_state_from_result(state, tool_name, result)
+
+        log_event(
+            "Tool result: "
+            + json.dumps(summarize_tool_result(tool_name, result), ensure_ascii=False)
+        )
+        log_event(
+            "State summary: " + json.dumps(summarize_state(state), ensure_ascii=False)
+        )
+
+    log_event(f"Stage {STAGE_LABELS['setup']} setup completed")
 
 
 def build_stage_input(
@@ -172,11 +356,27 @@ def execute_tool_calls(
     toolbox: Edu1Toolbox,
     function_calls: list[Any],
     state: dict[str, Any],
+    stage_name: str,
+    global_iteration_number: int,
+    stage_iteration_number: int,
 ) -> list[dict[str, str]]:
     tool_outputs: list[dict[str, str]] = []
 
     for function_call in function_calls:
         arguments = json.loads(function_call.arguments or "{}")
+        log_event(
+            f"Stage {STAGE_LABELS[stage_name]} {stage_name} | "
+            f"Global iteration {global_iteration_number} | "
+            f"Stage iteration {stage_iteration_number} | "
+            f"Tool {function_call.name}"
+        )
+        log_event(
+            "Tool arguments: "
+            + json.dumps(
+                summarize_tool_arguments(function_call.name, arguments),
+                ensure_ascii=False,
+            )
+        )
 
         try:
             result = toolbox.execute(function_call.name, arguments)
@@ -184,6 +384,16 @@ def execute_tool_calls(
             result = {"error": str(error)}
 
         update_state_from_result(state, function_call.name, result)
+        log_event(
+            "Tool result: "
+            + json.dumps(
+                summarize_tool_result(function_call.name, result),
+                ensure_ascii=False,
+            )
+        )
+        log_event(
+            "State summary: " + json.dumps(summarize_state(state), ensure_ascii=False)
+        )
 
         tool_outputs.append(
             {
@@ -206,6 +416,8 @@ def run_agent(config: AppConfig) -> dict[str, Any]:
     run_deterministic_setup(toolbox, state)
 
     for stage_index, stage_name in enumerate(AGENT_STAGE_SEQUENCE):
+        log_event(f"Stage {STAGE_LABELS[stage_name]} {stage_name} started")
+        stage_iterations = 0
         stage_tools = build_tool_definitions(TOOL_STAGE_GROUPS[stage_name])
         stage_input = build_stage_input(
             stage_name=stage_name,
@@ -233,6 +445,7 @@ def run_agent(config: AppConfig) -> dict[str, Any]:
 
         while not is_stage_complete(stage_name, state):
             total_iterations += 1
+            stage_iterations += 1
             if total_iterations > config.max_agent_iterations:
                 raise ValueError(
                     f"Agent exceeded the maximum number of iterations ({config.max_agent_iterations})."
@@ -248,6 +461,9 @@ def run_agent(config: AppConfig) -> dict[str, Any]:
                 toolbox=toolbox,
                 function_calls=function_calls,
                 state=state,
+                stage_name=stage_name,
+                global_iteration_number=total_iterations,
+                stage_iteration_number=stage_iterations,
             )
 
             response = client.responses.create(
@@ -259,7 +475,14 @@ def run_agent(config: AppConfig) -> dict[str, Any]:
                 max_tool_calls=1,
             )
 
+        log_event(f"Stage {STAGE_LABELS[stage_name]} {stage_name} completed")
+
     if "result" not in state:
         raise ValueError("Agent finished without producing the final result.")
+
+    log_event("Agent completed with final result")
+    log_event(
+        "Final result: " + json.dumps(summarize_result_data(state["result"]), ensure_ascii=False)
+    )
 
     return state["result"]

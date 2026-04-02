@@ -3,6 +3,19 @@
 This file stores implementation-oriented notes for EDU1.
 It is separate from `EDU1_README.md`, which should stay focused on the app itself.
 
+## Implementation Summary
+
+- The project started from the planned staged-agent design described in `EDU1_README.md`.
+- The implementation order mostly followed the original plan: `models.py`, `config.py`, `data_loader.py`, `api_client.py`, `tools.py`, `agent.py`, `pipeline.py`, `main.py`.
+- The initial plan assumed that the model would drive the full 3-stage workflow, including the `setup` stage tools.
+- In practice, this did not work reliably. During debugging, the model repeatedly called `extract_people_payload` without passing `rawData`, which caused loops and wasted iterations.
+- The key architectural correction was to move `setup` out of the model loop and execute it deterministically in application code before the model-driven stages begin.
+- After that change, the model was left only with the narrow decision-heavy part of the workflow: `selection` and `finalize`.
+- This aligned better with the learning goal of EDU1: OpenAI should contribute task-specific world knowledge, but deterministic data preparation should stay in code.
+- During debugging, we also discovered that workbench scripts calling real APIs need hard execution guards. This rule was added to both `AGENTS.md` and `EDU1_AGENTS.md`.
+- The final implementation also added simple console logs so the app shows step-by-step progress, stage numbers, tool names, iteration numbers, and short state summaries without exposing secrets.
+- The current architecture is stable and easier to explain than the original fully model-driven `setup` idea.
+
 ## Recommended Implementation Order
 
 1. `models.py`
