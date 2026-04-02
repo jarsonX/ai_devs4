@@ -26,7 +26,7 @@ It is separate from `EDU1_README.md`, which should stay focused on the app itsel
    At this point the underlying local logic and API integration should already exist.
 
 6. `agent.py`
-   Implement stage order, prompts, runtime state, stage completion checks, tool execution handling, and the main agent loop.
+   Implement deterministic setup first, then the model-driven stages, prompts, runtime state, stage completion checks, tool execution handling, and the main agent loop.
    This is the most complex module and should be built on top of finished tools.
 
 7. `pipeline.py`
@@ -56,6 +56,7 @@ It is separate from `EDU1_README.md`, which should stay focused on the app itsel
 
 - After `agent.py`:
   Run the staged flow and confirm that:
+  - deterministic setup prepares `rawData`, `people`, and `cities` before the model-driven stages start,
   - the stages advance in the expected order,
   - the model-selected city is validated,
   - `selectedCity` enters state only after validation.
@@ -71,6 +72,7 @@ It is separate from `EDU1_README.md`, which should stay focused on the app itsel
 - Keep `main.py` thin.
 - Keep `pipeline.py` high-level.
 - Keep prompts and stage logic in `agent.py`.
+- Keep deterministic setup in application code, not in the model loop.
 - Keep execution logic in `tools.py`.
 - Keep local file handling in `data_loader.py`.
 - Keep remote API handling in `api_client.py`.

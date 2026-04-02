@@ -12,6 +12,10 @@ from .data_loader import (
 from .models import FinalResult, Person
 
 
+# This mapping groups tools by the stage of the workflow in which they are expected
+# to be used. It gives developers a quick mental model of the end-to-end process:
+# first load and normalize data, then select a valid city and person, and finally
+# enrich that selection with the external access level and build the final result.
 TOOL_STAGE_GROUPS = {
     "setup": [
         "load_people_data",
@@ -29,6 +33,10 @@ TOOL_STAGE_GROUPS = {
 }
 
 
+# Convert a strongly typed Person object into a plain dictionary that matches the
+# JSON-like structure expected by tools and API responses. This keeps the internal
+# domain model separate from the lightweight transport format used when values are
+# passed between tools.
 def serialize_person(person: Person) -> dict[str, Any]:
     return {
         "name": person.name,
@@ -38,6 +46,10 @@ def serialize_person(person: Person) -> dict[str, Any]:
     }
 
 
+# Rebuild a Person domain object from a dictionary received from a tool call or an
+# intermediate result. The explicit validation here is important for learning and
+# debugging: it makes invalid inputs fail close to the source instead of allowing
+# partially broken data to flow deeper into the pipeline.
 def deserialize_person(data: dict[str, Any]) -> Person:
     name = data.get("name")
     surname = data.get("surname")
@@ -61,6 +73,10 @@ def deserialize_person(data: dict[str, Any]) -> Person:
     )
 
 
+# Convert the final domain result into the JSON-like structure returned to the rest
+# of the application. This function mirrors serialize_person and makes the final
+# output format explicit in one place, which reduces duplication and makes future
+# output changes easier to reason about.
 def serialize_final_result(result: FinalResult) -> dict[str, Any]:
     return {
         "selectedCity": result.selected_city,
@@ -69,8 +85,15 @@ def serialize_final_result(result: FinalResult) -> dict[str, Any]:
     }
 
 
+# Build the tool schema definitions that can be exposed to the model. The returned
+# list is not the implementation itself: it is the contract that describes which
+# tools exist, what each tool is for, and what arguments it accepts. The optional
+# filter allows the caller to expose only a selected subset of tools when needed.
 def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[str, Any]]:
     tool_definitions = [
+        # This tool starts the workflow by loading the raw EDU1 dataset from disk.
+        # It intentionally has no input parameters because the file location comes
+        # from application configuration, not from the model.
         {
             "type": "function",
             "name": "load_people_data",
@@ -82,6 +105,9 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
                 "additionalProperties": False,
             },
         },
+        # This tool extracts the actual list of people from the raw JSON structure.
+        # It hides file-format details from the rest of the workflow, so later tools
+        # can operate on a clean, normalized collection of person records.
         {
             "type": "function",
             "name": "extract_people_payload",
@@ -97,6 +123,9 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
                 "additionalProperties": False,
             },
         },
+        # This tool derives the set of unique cities from the people list while
+        # preserving stable order. Its main role is to give the model a controlled
+        # list of valid city options instead of asking it to infer them on its own.
         {
             "type": "function",
             "name": "extract_unique_cities",
@@ -123,6 +152,9 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
                 "additionalProperties": False,
             },
         },
+        # This tool checks whether the city chosen by the model really exists in
+        # the available city list. It acts as a guardrail that turns a free-form
+        # model choice into a validated decision before the workflow moves on.
         {
             "type": "function",
             "name": "validate_selected_city",
@@ -143,6 +175,9 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
                 "additionalProperties": False,
             },
         },
+        # This tool resolves the validated city to exactly one person. The schema
+        # reflects an important business rule in this exercise: the selected city
+        # should identify one and only one person in the dataset.
         {
             "type": "function",
             "name": "find_person_by_city",
@@ -170,6 +205,9 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
                 "additionalProperties": False,
             },
         },
+        # This tool enriches the selected person with an external access level.
+        # It only asks for the identity fields needed by the API, which keeps the
+        # tool focused on a single responsibility instead of passing full records.
         {
             "type": "function",
             "name": "get_access_level",
@@ -185,6 +223,9 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
                 "additionalProperties": False,
             },
         },
+        # This tool produces the final business object expected by EDU1. It gathers
+        # the validated city, the selected person, and the fetched access level into
+        # one explicit result so that the workflow ends with a single clear payload.
         {
             "type": "function",
             "name": "build_final_result",
@@ -223,23 +264,39 @@ def build_tool_definitions(allowed_names: list[str] | None = None) -> list[dict[
     ]
 
 
+# This class is the concrete toolbox used by the EDU1 agent. It connects three
+# layers: local data loading, domain validation/selection logic, and the external
+# API call for access level. In practice, it is the runtime implementation behind
+# the tool schemas defined above.
 class Edu1Toolbox:
+    # Store the application configuration and prepare the API client once, so every
+    # tool method can reuse the same dependencies instead of rebuilding them.
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self.api_client = Edu1ApiClient(config)
 
+    # Load the raw people file using the configured path and wrap it in a named
+    # field. Returning a dictionary keeps the shape consistent with other tool
+    # outputs, which makes orchestration simpler for the calling agent.
     def load_people_data(self) -> dict[str, Any]:
         raw_data = load_people_data(self.config.data_people_path)
         return {
             "rawData": raw_data,
         }
 
+    # Transform the raw file content into a normalized list of serialized people.
+    # This method bridges the lower-level data loader and the tool interface by
+    # converting domain objects into plain dictionaries safe to pass between tools.
     def extract_people_payload(self, raw_data: dict[str, Any]) -> dict[str, Any]:
         people = extract_people_payload(raw_data)
         return {
             "people": [serialize_person(person) for person in people],
         }
 
+    # Turn the serialized tool input back into Person objects, then derive the list
+    # of unique cities. The deserialize -> process -> serialize pattern is repeated
+    # throughout this file and is worth noticing because it cleanly separates tool
+    # transport data from the internal domain model.
     def extract_unique_cities(self, people_data: list[dict[str, Any]]) -> dict[str, Any]:
         people = [deserialize_person(item) for item in people_data]
         cities = extract_unique_cities(people)
@@ -247,6 +304,10 @@ class Edu1Toolbox:
             "cities": cities,
         }
 
+    # Normalize and validate the city selected by the model against the known list
+    # of available cities. Instead of raising an error for an invalid choice, this
+    # method returns an explicit validity flag so the calling workflow can decide
+    # how to recover or ask the model to try again.
     def validate_selected_city(
         self,
         selected_city: str,
@@ -265,6 +326,10 @@ class Edu1Toolbox:
             "selectedCity": None,
         }
 
+    # Find the single person assigned to the chosen city. The method raises errors
+    # when the city matches zero or multiple people because both cases violate the
+    # exercise assumption that city selection should resolve to one unambiguous
+    # person before the workflow can continue.
     def find_person_by_city(
         self,
         people_data: list[dict[str, Any]],
@@ -282,12 +347,19 @@ class Edu1Toolbox:
             "selectedPerson": serialize_person(matches[0]),
         }
 
+    # Ask the external EDU1 API for the access level of the selected person. This
+    # method intentionally stays thin: networking details are delegated to the API
+    # client so the toolbox keeps its focus on tool orchestration.
     def get_access_level(self, name: str, surname: str, birth_year: int) -> dict[str, Any]:
         access_level = self.api_client.get_access_level(name, surname, birth_year)
         return {
             "accessLevel": access_level,
         }
 
+    # Assemble the final result object from validated inputs. The method converts
+    # the incoming dictionary back to a Person, creates the FinalResult domain
+    # object, and only then serializes it. That extra step keeps the final output
+    # grounded in the domain model instead of stitching dictionaries together.
     def build_final_result(
         self,
         person_data: dict[str, Any],
@@ -304,6 +376,10 @@ class Edu1Toolbox:
             "result": serialize_final_result(result),
         }
 
+    # Dispatch a tool call by name, validate the incoming arguments, and forward
+    # execution to the matching method. This function is the central gateway for
+    # runtime tool execution, so its validation errors are deliberately explicit:
+    # they teach both developers and the agent what input shape each tool expects.
     def execute(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if tool_name == "load_people_data":
             return self.load_people_data()

@@ -48,6 +48,10 @@
 - If multiple causes are possible, prioritize them from most likely to least likely.
 - Do not hide problems behind shortcuts or hacks if that would reduce code quality or learning value.
 - After fixing an issue, explain the root cause and how to recognize similar problems in the future.
+- Any debug, workbench, or inspection script that makes real OpenAI or external API calls MUST include a hard execution guard before it is run.
+- The guard MUST limit execution with a concrete maximum, such as `max_iterations`, `max_model_requests`, or `max_tool_calls`.
+- The default limit for exploratory debugging should be small and explicit. Do not rely on manual interruption as the primary safety mechanism.
+- If the limit is reached, the script MUST stop immediately and fail with a clear error message explaining which guard was hit.
 
 ## Decision Policy
 

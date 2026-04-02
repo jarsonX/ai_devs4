@@ -19,7 +19,7 @@ This app should mirror selected ideas from `L02_findhim`, but in a much smaller 
 ## Current Business Goal
 
 The app should:
-1. load people data from `data/EDU1/data_people.json`,
+1. load people data from `data/EDU1/input/data_people.json`,
 2. extract the business payload from `payload_sent.answer`,
 3. collect the unique city names from that list,
 4. ask OpenAI to choose the city located farthest south from the provided list,
@@ -37,6 +37,7 @@ Its role is limited to a narrow decision:
 - choose the city that is farthest south.
 
 The model should not invent new city names or rewrite the provided values.
+The model is not responsible for loading files, extracting payloads, or passing large raw payloads between deterministic steps.
 
 ## Expected Output
 
@@ -58,6 +59,7 @@ Goal:
 - collect unique city names.
 
 This stage should be fully deterministic.
+In the current implementation, this stage is executed directly by application code before the model-driven stages begin.
 
 ### 2. Selection
 
@@ -82,7 +84,7 @@ This stage should use deterministic code and external API integration.
 The current design keeps responsibilities narrow:
 
 - OpenAI chooses the southernmost city from a closed list.
-- Application code loads data, validates structure, validates model output, selects the person, calls the AI_devs API, and builds the final result.
+- Application code performs deterministic setup, validates structure, validates model output, selects the person, calls the AI_devs API, and builds the final result.
 
 This split keeps the agent useful without making it responsible for the entire business flow.
 
@@ -93,7 +95,7 @@ The current tool plan contains 7 tools grouped by workflow stage.
 ### Setup Tools
 
 - `load_people_data`
-  Loads the raw JSON object from `data/EDU1/data_people.json`.
+  Loads the raw JSON object from `data/EDU1/input/data_people.json`.
 - `extract_people_payload`
   Extracts `payload_sent.answer` and returns a clean list of people records.
 - `extract_unique_cities`
@@ -115,10 +117,9 @@ The current tool plan contains 7 tools grouped by workflow stage.
 
 ## Tool Exposure Strategy
 
-The agent should not see all tools at once.
-Instead, each stage should expose only the tools needed for that stage:
+The model-driven agent should not see all tools at once.
+Instead, each model-driven stage should expose only the tools needed for that stage:
 
-- `setup`: `load_people_data`, `extract_people_payload`, `extract_unique_cities`
 - `selection`: `validate_selected_city`, `find_person_by_city`
 - `finalize`: `get_access_level`, `build_final_result`
 
@@ -126,6 +127,8 @@ This follows the learning goal taken from `L02_findhim`:
 - keep the workflow staged,
 - reduce unnecessary tool choices,
 - make each step easier to understand and debug.
+
+The deterministic `setup` stage still uses the setup tools, but it is executed directly by application code instead of by the model.
 
 ## Planned Agent State
 
@@ -146,7 +149,7 @@ Each field represents one important milestone in the workflow.
 
 The current stage completion conditions are:
 
-- `setup` is complete when `rawData`, `people`, and `cities` exist in state.
+- deterministic `setup` is complete when `rawData`, `people`, and `cities` exist in state.
 - `selection` is complete when `selectedCity` and `selectedPerson` exist in state.
 - `finalize` is complete when `accessLevel` and `result` exist in state.
 
@@ -167,9 +170,9 @@ This keeps the runtime state limited to validated business data.
 The current high-level flow is:
 
 1. `setup`
-   - load raw data
-   - extract people
-   - extract cities
+   - deterministic application code loads raw data
+   - deterministic application code extracts people
+   - deterministic application code extracts cities
 2. `selection`
    - let the model choose a city from the closed list
    - validate the chosen city
@@ -215,7 +218,7 @@ The current responsibility split is:
 - `pipeline.py`
   High-level end-to-end flow. It should load config, run the agent, and return or print the final result.
 - `agent.py`
-  Agent orchestration. It should define stages, prompts, tool exposure, runtime state, and stage transitions.
+  Agent orchestration. It should run the deterministic setup, define the model-driven stages, prompts, tool exposure, runtime state, and stage transitions.
 - `tools.py`
   Tool definitions and tool execution. It should expose deterministic operations to the model and dispatch calls to application code.
 - `data_loader.py`

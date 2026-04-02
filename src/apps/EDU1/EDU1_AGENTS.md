@@ -20,6 +20,9 @@
 - The agent MUST NOT edit files unless explicitly requested.  
 - The agent MUST simplify concepts from `L02_findhim`.  
 - The agent MUST NOT assume prior understanding of the reference implementation.  
+- Any debug, workbench, or inspection script that makes real OpenAI or external API calls MUST include a hard execution guard before it is run.
+- The guard MUST use an explicit small limit, such as `max_iterations`, `max_model_requests`, or `max_tool_calls`.
+- The script MUST stop immediately with a clear error if the limit is reached. Manual interruption is not a sufficient primary guard.
 
 ---
 

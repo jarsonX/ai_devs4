@@ -5,9 +5,12 @@ from pprint import pprint
 from ..config import get_config
 from ..tools import Edu1Toolbox
 
+MAX_EXTERNAL_CALLS = 1
+
 
 def main() -> None:
     toolbox = Edu1Toolbox(get_config())
+    external_calls_used = 0
 
     raw = toolbox.load_people_data()
     raw_data = raw["rawData"].copy()
@@ -39,6 +42,12 @@ def main() -> None:
     print("find_person_by_city:")
     pprint(person)
     print()
+
+    if external_calls_used >= MAX_EXTERNAL_CALLS:
+        raise ValueError(
+            f"External call guard reached. MAX_EXTERNAL_CALLS={MAX_EXTERNAL_CALLS}"
+        )
+    external_calls_used += 1
 
     access = toolbox.get_access_level(
         person["selectedPerson"]["name"],
