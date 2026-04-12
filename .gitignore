@@ -5,3 +5,4 @@ venv/
 .env
 __pycache__/
 *.pyc
+src/apps/L03_package/L03_ćwiczenie.md
