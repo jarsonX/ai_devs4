@@ -1,6 +1,6 @@
-# L03_package
+# L03_proxy
 
-L03_package is an educational app for the AI_devs course.
+L03_proxy is an educational app for the AI_devs course.
 Its goal is to expose a public HTTP endpoint that behaves like a conversation-aware proxy assistant for a logistics operator.
 
 The task scenario is simulated by the course.
@@ -92,9 +92,9 @@ The endpoint is expected to return:
 ## External Package API
 
 The external packages API is provided by the course organizer and is not exposed in the public repository.
-The application should read its real address from a configured application setting, for example:
+The application should read its real address from configuration, for example from:
 
-`https://external.api.address`
+`L03_PROXY_API_URL`
 
 It supports two actions:
 
@@ -215,9 +215,9 @@ The current high-level flow is:
 
 The current MVP 1 file structure is expected to be:
 
-- `L03_PACKAGE_README.md`
+- `L03_PROXY_README.md`
   Project notes and design decisions.
-- `L03_PACKAGE_DEV_NOTES.md`
+- `L03_PROXY_DEV_NOTES.md`
   Implementation-oriented notes.
 - `main.py`
   Thin application entrypoint.
@@ -365,6 +365,36 @@ The task description suggests:
 
 The exact deployment path is still TBD.
 
+## Hub Verification Submission
+
+Once the public endpoint is reachable, the app should be submitted to the configured hub verification endpoint from:
+
+`HUB_VERIFY_URL`
+
+The task name must be:
+
+- `proxy`
+
+The expected verification payload is:
+
+```json
+{
+  "apikey": "<HUB_API_KEY>",
+  "task": "proxy",
+  "answer": {
+    "url": "<PUBLIC_ENDPOINT_URL>",
+    "sessionID": "<VERIFICATION_SESSION_ID>"
+  }
+}
+```
+
+Important submission details:
+
+- `url` must be the full public URL of the HTTP endpoint exposed for the operator,
+- `sessionID` may be any chosen identifier, but the hub will use it as the conversation session ID during testing,
+- `HUB_VERIFY_URL`, `HUB_API_KEY`, and any real endpoint addresses should be stored outside documentation, for example in `.env`,
+- the public tunnel or deployed server must stay available while the hub runs the verification flow.
+
 ## Verification Plan
 
 The current minimum verification checklist is:
@@ -374,6 +404,16 @@ The current minimum verification checklist is:
 - tool loop behavior test,
 - package API integration test,
 - end-to-end public endpoint verification through the hub.
+
+The practical final verification flow should be:
+
+1. run the HTTP app locally and confirm it accepts `{ "sessionID", "msg" }` JSON input and returns `{ "msg" }`,
+2. expose the app publicly through `ngrok`, `pinggy`, or VPS hosting,
+3. confirm the public URL points to the real API endpoint path expected by the task,
+4. submit the public URL and chosen `sessionID` to `HUB_VERIFY_URL`,
+5. keep the public endpoint alive while the hub conducts the operator conversation test,
+6. verify from logs that the same `sessionID` preserves conversation state across multiple requests,
+7. confirm that successful redirect flows return the `confirmation` code back to the operator naturally.
 
 ## Assumptions
 
@@ -395,6 +435,6 @@ The current agreed runtime limits are:
 
 ## Status
 
-This README documents the current understanding of the L03_package task.
+This README documents the current understanding of the L03_proxy task.
 Implementation has not started yet.
 The current MVP 1 design decisions have been documented, including conversation-based detection of reactor-related context.

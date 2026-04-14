@@ -20,6 +20,15 @@
 - Preserve existing project conventions unless there is a strong reason to improve them.
 - Be honest about uncertainty, assumptions, trade-offs, and risks.
 
+## Secrets Policy
+
+- Never place secrets in source code, documentation, notes, markdown files, commit messages, or logs.
+- Treat API URLs, API keys, tokens, credentials, internal endpoints, and similar operational values as secrets unless the user explicitly says otherwise.
+- Store secrets only in `.env` files or other dedicated secret stores approved by the user.
+- Outside `.env`, always use masking or configuration variable names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
+- If a file is listed in `.gitignore`, it may contain secrets and must be handled with extra caution.
+- When writing documentation, prefer describing where a value comes from rather than showing the real value.
+
 ## Course Materials
 
 - Treat `course_materials/` as the primary local conceptual reference for solving course tasks. Treat the existing codebase as the primary source of truth for current implementation behavior.

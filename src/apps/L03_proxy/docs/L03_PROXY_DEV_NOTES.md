@@ -1,4 +1,4 @@
-# L03_package Development Notes
+# L03_proxy Development Notes
 
 ## Implementation Summary
 
@@ -20,7 +20,7 @@
    Define the small session and response models first so the rest of the app shares the same vocabulary.
 
 2. `config.py`
-   Add configuration loading for API keys, model settings, file paths, and runtime limits.
+   Add configuration loading for API keys, masked endpoint configuration names, file paths, and runtime limits.
 
 3. `session_store.py`
    Implement JSON-based session loading and saving before the agent logic begins.
@@ -125,8 +125,13 @@
     - iteration-limit and timeout behavior.
 
 14. Expose the application publicly and perform end-to-end validation.
-    Publish the local app through a tunnel or VPS, test the real endpoint manually, and only then submit it to the course verification hub.
-    The first debugging round should happen locally, not on the public URL.
+   Publish the local app through a tunnel or VPS, test the real endpoint manually, and only then submit it to the course verification hub.
+   Keep the real verification URL and API key in configuration such as `.env` entries like `HUB_VERIFY_URL` and `HUB_API_KEY`, not in markdown files.
+   The first debugging round should happen locally, not on the public URL.
+   Public exposure is not required for most development work:
+   - internal modules such as session handling, reactor-context detection, tool dispatch, and API integration can be tested without any HTTP server,
+   - the HTTP contract can be tested on a local server bound to `localhost`,
+   - a public URL is only required for the final end-to-end verification flow, when the external hub needs to send operator messages to the app over the internet.
 
 ## MVP 1 Runtime Profile
 

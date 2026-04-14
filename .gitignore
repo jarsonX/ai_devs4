@@ -5,4 +5,5 @@ venv/
 .env
 __pycache__/
 *.pyc
-src/apps/L03_package/L03_ćwiczenie.md
+src/apps/L03_proxy/L03_ćwiczenie.md
+src/apps/L03_proxy/L03_help_needed.md
