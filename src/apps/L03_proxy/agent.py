@@ -17,6 +17,7 @@ from openai.types.shared.reasoning_effort import ReasoningEffort
 from openai.types.shared_params.reasoning import Reasoning
 
 from .config import AppConfig
+from .logging_utils import append_log_event, mask_sensitive_payload
 from .models import AgentRunResult, ConversationMessage, SessionState, ToolExecutionResult
 from .tools import ProxyToolbox, build_tool_definitions
 
@@ -226,6 +227,7 @@ def build_tool_output(function_call: Any, tool_result: ToolExecutionResult) -> F
 
 # This helper executes all requested tool calls and returns model-ready tool outputs.
 def execute_tool_calls(
+    config: AppConfig,
     toolbox: ProxyToolbox,
     function_calls: list[Any],
     session_state: SessionState,
@@ -245,6 +247,14 @@ def execute_tool_calls(
                 payload={"error": str(error)},
             )
         else:
+            append_log_event(
+                config,
+                "tool_call_requested",
+                {
+                    "tool_name": tool_name,
+                    "arguments": mask_sensitive_payload(arguments),
+                },
+            )
             updated_state = update_session_state_from_tool_arguments(
                 updated_state,
                 tool_name,
@@ -260,6 +270,15 @@ def execute_tool_calls(
                 tool_result.to_dict(),
             )
 
+        append_log_event(
+            config,
+            "tool_call_completed",
+            {
+                "tool_name": tool_name,
+                "ok": tool_result.ok,
+                "payload": mask_sensitive_payload(tool_result.payload),
+            },
+        )
         tool_results.append(tool_result)
         tool_outputs.append(build_tool_output(function_call, tool_result))
 
@@ -301,6 +320,7 @@ def run_tool_loop(
             )
 
         tool_outputs, updated_state, tool_results = execute_tool_calls(
+            config,
             toolbox,
             function_calls,
             updated_state,
