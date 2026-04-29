@@ -1,60 +1,18 @@
 # L03_proxy Development Notes
 
-## Implementation Summary
+## Implementation Plan
 
-- The current MVP 1 design uses a simple public HTTP application with a bounded LLM tool-calling loop.
-- The app should keep independent conversation sessions in JSON files, one logical session per `sessionID`.
-- The LLM should receive only a compact `session_state` plus the last 5 conversation messages, not the full transcript.
-- The full transcript should still be persisted locally for debugging and review.
-- The current MVP 1 model recommendation is `gpt-5.4-mini` with `reasoning.effort = low`.
-- The external packages API should be accessed through a direct application client, not through MCP in MVP 1.
-- The hidden redirect rule must be enforced by backend code, not only by prompt instructions.
-- Reactor-related package detection should be based on operator conversation content in MVP 1, not on `check_package`.
-- Reactor-related package detection should be implemented as a deterministic backend rule, with an initial keyword and phrase detector refined after real log review.
-- Natural operator-facing communication and technical execution tracing are both required.
-- MCP may be revisited later as a possible MVP 2 refactor if tool portability becomes useful.
-
-## Recommended Implementation Order
-
-1. `models.py`
-   Define the small session and response models first so the rest of the app shares the same vocabulary.
-
-2. `config.py`
-   Add configuration loading for API keys, masked endpoint configuration names, file paths, and runtime limits.
-
-3. `session_store.py`
-   Implement JSON-based session loading and saving before the agent logic begins.
-
-4. `package_api_client.py`
-   Implement the external packages API client with response validation and request timeouts.
-
-5. `tools.py`
-   Implement `check_package`, `redirect_package`, and tool dispatch.
-
-6. `agent.py`
-   Implement prompt construction, compact session-state handling, recent-message window selection, reactor-context detection support, and the bounded tool loop.
-
-7. `pipeline.py`
-   Implement the high-level request flow: validate input, load session, run the agent, persist state, return response.
-
-8. `main.py`
-   Implement the HTTP entrypoint last and keep it thin.
-
-## Approved Implementation Plan
+This section is the source of truth for implementation work on `L03_proxy`.
+Follow it in order unless a later implementation detail proves that a step must be split or adjusted.
+When a step is changed, update this section first so the plan and the work stay aligned.
 
 1. Prepare configuration and the application file skeleton.
    Create or complete `config.py`, `models.py`, `session_store.py`, `package_api_client.py`, `tools.py`, `agent.py`, `pipeline.py`, and `main.py`.
    This step should stabilize the module boundaries before implementation details begin.
 
 2. Implement application configuration.
-   Add environment loading, runtime limits, timeouts, the MVP 1 model selection, and the main paths used by the app.
-   The current agreed defaults are:
-   - model: `gpt-5.4-mini`
-   - reasoning: `reasoning.effort = low`
-   - `max_tool_iterations_per_request = 5`
-   - `llm_timeout_seconds = 30`
-   - `external_api_timeout_seconds = 10`
-   - `total_request_timeout_seconds = 45`
+   Add environment loading, runtime defaults, timeouts, and the main paths used by the app.
+   Keep concrete default values in `Runtime Defaults`.
 
 3. Implement data models and session structure.
    Define the minimum models needed for request payloads, response payloads, compact session state, transcript entries, and tool results.
@@ -114,55 +72,70 @@
     The logs should make it easy to inspect both the operator conversation and the matching internal app flow.
 
 13. Run scenario-based MVP 1 verification.
-    Verify at least:
-    - normal conversation,
-    - package check flow,
-    - package redirect flow,
-    - missing `packageid`,
-    - missing security `code`,
-    - reactor-related context detection,
-    - multi-session separation,
-    - iteration-limit and timeout behavior.
+    Use `Verification Checklist` as the required local verification scope.
 
 14. Expose the application publicly and perform end-to-end validation.
-   Publish the local app through a tunnel or VPS, test the real endpoint manually, and only then submit it to the course verification hub.
-   Keep the real verification URL and API key in configuration such as `.env` entries like `HUB_VERIFY_URL` and `HUB_API_KEY`, not in markdown files.
-   The first debugging round should happen locally, not on the public URL.
-   Public exposure is not required for most development work:
-   - internal modules such as session handling, reactor-context detection, tool dispatch, and API integration can be tested without any HTTP server,
-   - the HTTP contract can be tested on a local server bound to `localhost`,
-   - a public URL is only required for the final end-to-end verification flow, when the external hub needs to send operator messages to the app over the internet.
+    Publish the local app through a tunnel or VPS, test the real endpoint manually, and only then submit it to the course verification hub.
+    Keep the real verification URL and API key in configuration such as `.env` entries like `HUB_VERIFY_URL` and `HUB_API_KEY`, not in markdown files.
+    The first debugging round should happen locally, not on the public URL.
+    Public exposure is not required for most development work:
+    - internal modules such as session handling, reactor-context detection, tool dispatch, and API integration can be tested without any HTTP server,
+    - the HTTP contract can be tested on a local server bound to `localhost`,
+    - a public URL is only required for the final end-to-end verification flow, when the external hub needs to send operator messages to the app over the internet.
 
-## MVP 1 Runtime Profile
+## Runtime Defaults
 
 - model: `gpt-5.4-mini`
 - reasoning: `reasoning.effort = low`
 - LLM input: system prompt plus compact `session_state` plus the last 5 conversation messages
-- session persistence: JSON files
+- session persistence: one JSON file per `sessionID`
 - tool loop limit: `5`
 - LLM timeout: `30s`
 - external API timeout: `10s`
 - total request timeout: `45s`
+- external packages API integration: direct application client in `package_api_client.py`
 
-## Verification Suggestions
+## Design Guardrails
+
+- Keep the HTTP entrypoint thin.
+- Keep session persistence separate from agent orchestration.
+- Keep raw external API access inside `package_api_client.py`.
+- Keep tool execution inside `tools.py`.
+- Keep hidden redirect enforcement in backend code, not only in prompts.
+- Detect reactor-related package context from operator conversation content in MVP 1.
+- Implement reactor-related detection as a deterministic backend rule with an initial keyword and phrase set.
+- Do not treat `check_package` as authoritative proof of reactor-related contents unless later testing shows that the API exposes such data.
+- Keep the LLM context compact: prompt plus compact state plus recent message window.
+- Persist full conversation transcripts for debugging, but do not send the full transcript to the LLM by default.
+- Keep technical logs separate from conversation transcripts.
+- Mask secrets, API keys, and security codes in technical logs.
+- Do not add MCP to MVP 1 unless a concrete implementation problem justifies the extra complexity.
+- MCP may be revisited later as a possible MVP 2 refactor if tool portability becomes useful.
+
+## Verification Checklist
 
 - After `config.py`:
-  Verify that required environment variables and limits are loaded correctly.
+  Verify that required environment variables, runtime defaults, paths, and limits are loaded correctly.
 
 - After `session_store.py`:
-  Create, load, update, and reload a JSON session file for one `sessionID`.
+  Create, load, update, and reload JSON session files for at least two independent `sessionID` values.
 
 - After `package_api_client.py`:
-  Verify request timeouts, response validation, and error handling against the external API.
+  Verify request timeouts, response-shape validation, and error handling against the external API.
 
 - After `tools.py`:
   Call each tool directly and confirm the output shape is JSON-serializable and stable.
+
+- After reactor-related context detection:
+  Verify positive and negative examples and confirm the flag persists in compact session state.
+
+- After hidden redirect enforcement:
+  Verify that reactor-related redirects force the real destination to `PWR6132PL` without exposing it in operator-facing text.
 
 - After `agent.py`:
   Confirm that:
   - only compact session state plus the last 5 messages are sent to the LLM,
   - missing business inputs trigger follow-up questions instead of invalid tool calls,
-  - reactor-related context can be detected from conversation content and persisted in session state,
   - the chosen model and reasoning setting are stable enough for the short-context tool loop,
   - the tool loop stops at the configured iteration limit,
   - the final assistant response is natural.
@@ -177,15 +150,8 @@
 - After `main.py`:
   Verify the HTTP contract, status codes, and JSON responses through the real endpoint.
 
-## Design Guardrails
+- Before public exposure:
+  Confirm the local endpoint works, logs are safe, `.env` contains real secrets, and documentation does not contain real operational values.
 
-- Keep the HTTP entrypoint thin.
-- Keep session persistence separate from agent orchestration.
-- Keep raw external API access inside `package_api_client.py`.
-- Keep tool execution inside `tools.py`.
-- Keep hidden redirect enforcement in backend code, not only in prompts.
-- Do not treat `check_package` as authoritative proof of reactor-related contents unless later testing shows that the API actually exposes such data.
-- Keep reactor-related detection deterministic in MVP 1, even if the LLM helps maintain conversation flow.
-- Keep the LLM context compact: prompt plus state plus recent window.
-- Keep full transcripts for debugging, but mask secrets and codes in technical logs.
-- Do not add MCP to MVP 1 unless a concrete implementation problem justifies the extra complexity.
+- During public verification:
+  Keep the tunnel or deployed server alive while the hub runs the operator conversation test.

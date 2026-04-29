@@ -436,5 +436,5 @@ The current agreed runtime limits are:
 ## Status
 
 This README documents the current understanding of the L03_proxy task.
-Implementation has not started yet.
+Implementation is currently in progress.
 The current MVP 1 design decisions have been documented, including conversation-based detection of reactor-related context.
