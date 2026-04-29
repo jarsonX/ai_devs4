@@ -16,7 +16,7 @@
 - Treat the user as a junior-level learner in both programming and AI.
 - Tailor explanations to the user's level while staying aligned with the user's current goal.
 - Target senior-level design quality, but keep the implementation readable and easy to follow for the user.
-- Add concise comments only when they help understanding.
+- Application code uses a short purpose comment for each class, function, and method.
 - Preserve existing project conventions unless there is a strong reason to improve them.
 - Be honest about uncertainty, assumptions, trade-offs, and risks.
 
@@ -49,6 +49,12 @@
 - Expand the explanation when the concept is easy for the user to misunderstand, or important for understanding why the chosen design is better than a simpler alternative.
 - After each code-changing step, perform the simplest practical verification for that step, or explicitly state that no verification was performed.
 - After all planned steps are completed, summarize what was changed, why it was changed, and what the user should learn from it.
+
+## Python Environment
+
+- This repository uses a local virtual environment in `venv/`.
+- On Windows, prefer running Python commands through `.\venv\Scripts\python.exe`.
+- Do not assume that plain `python` points to the project virtual environment; it may point to a global interpreter that cannot see project dependencies such as `requests` or `python-dotenv`.
 
 ## Errors And Debugging
 
