@@ -37,9 +37,10 @@ When a step is changed, update this section first so the plan and the work stay 
    This module should expose only JSON-serializable tool outputs.
 
 7. Implement reactor-related context detection in backend code.
-   Add a deterministic detector based on operator message content.
-   Start with a small keyword and phrase set and store the result in session state, for example through a flag such as `reactor_related_context_detected`.
-   Refine the detector later after reviewing real operator logs.
+   Add a hybrid detector based on operator message content.
+   Keep a deterministic pre-check for direct wording, but use a structured AI classifier for paraphrases and inflected wording.
+   Store the validated result in session state through a flag such as `reactor_related_context_detected`.
+   Backend code must validate classifier output before trusting it.
 
 8. Implement backend enforcement for hidden redirects.
    When `redirect_package` is executed and the reactor-related flag is active, force the real destination to `PWR6132PL` in backend code.
@@ -118,7 +119,8 @@ When a step is changed, update this section first so the plan and the work stay 
 - Keep tool execution inside `tools.py`.
 - Keep hidden redirect enforcement in backend code, not only in prompts.
 - Detect reactor-related package context from operator conversation content in MVP 1.
-- Implement reactor-related detection as a deterministic backend rule with an initial keyword and phrase set.
+- Implement reactor-related detection as a hybrid backend-controlled flow:
+  deterministic pre-check first, structured AI classification for ambiguous wording, backend validation before state updates.
 - Do not treat `check_package` as authoritative proof of reactor-related contents unless later testing shows that the API exposes such data.
 - Keep the LLM context compact: prompt plus compact state plus recent message window.
 - Persist full conversation transcripts for debugging, but do not send the full transcript to the LLM by default.
@@ -143,7 +145,7 @@ When a step is changed, update this section first so the plan and the work stay 
   Call each tool directly and confirm the output shape is JSON-serializable and stable.
 
 - After reactor-related context detection:
-  Verify positive and negative examples and confirm the flag persists in compact session state.
+  Verify positive and negative examples, including paraphrases such as package cores, and confirm the flag persists in compact session state.
 
 - After hidden redirect enforcement:
   Verify that reactor-related redirects force the real destination to `PWR6132PL` without exposing it in operator-facing text.
@@ -172,3 +174,30 @@ When a step is changed, update this section first so the plan and the work stay 
 
 - During public verification:
   Keep the tunnel or deployed server alive while the hub runs the operator conversation test.
+
+## Final Outcome
+
+MVP 1 has passed course hub verification.
+
+The final working implementation includes:
+
+- a local HTTP endpoint exposed publicly through a short-lived `pinggy` tunnel,
+- a submission helper that sends the public URL to `L03_VERIFY_API_URL`,
+- bounded OpenAI tool orchestration for package checks and redirects,
+- backend-enforced hidden redirects to `PWR6132PL`,
+- destination-code normalization before calling the packages API,
+- hybrid reactor-context detection:
+  deterministic pre-check for direct wording plus structured AI classification for paraphrases and Polish inflection,
+- request-size and field-length safeguards before model or tool execution,
+- per-session transcript persistence and masked technical logs.
+
+The main debugging lesson was that closed keyword lists were too brittle for recognizing reactor-related package descriptions.
+The reliable pattern is:
+
+1. let the model classify ambiguous natural language into a small structured schema,
+2. validate that classification in backend code,
+3. store only the validated compact decision in session state,
+4. keep the side-effecting redirect rule enforced by deterministic backend code.
+
+The second practical lesson was that prompt-only behavior is not enough for operational correctness.
+Prompt changes helped with natural small talk, but successful task completion required backend fixes for destination normalization and hidden redirect enforcement.

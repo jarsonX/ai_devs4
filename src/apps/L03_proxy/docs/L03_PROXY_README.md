@@ -226,7 +226,8 @@ The agreed behavior is:
 The hidden redirect must be enforced by backend code, not only by prompt instructions.
 For MVP 1, the app should detect reactor-related context from the operator conversation, not from `check_package`.
 `check_package` should be used for normal package handling only, because the current task description does not guarantee that it reveals package contents.
-The backend may keep a compact session flag such as `reactor_related_context_detected` and use it when processing `redirect_package`.
+The backend keeps a compact session flag such as `reactor_related_context_detected` and uses it when processing `redirect_package`.
+The flag can be set by a deterministic pre-check or by a validated AI classifier, but the final redirect override is still enforced in backend code.
 
 ## Planned Stage Flow
 
@@ -261,6 +262,8 @@ The current MVP 1 file structure is expected to be:
   External packages API integration.
 - `session_store.py`
   Session persistence and retrieval.
+- `reactor_classifier.py`
+  Structured AI classification for reactor-related package context.
 - `models.py`
   Small shared data models.
 - `config.py`
@@ -282,6 +285,8 @@ The current intended split is:
   Define tools and dispatch tool execution.
 - `package_api_client.py`
   Handle remote packages API access only.
+- `reactor_classifier.py`
+  Classify reactor-related package context from conversation text with structured output.
 - `session_store.py`
   Handle session memory only.
 - `models.py`
@@ -309,6 +314,7 @@ The current minimum expected contents are:
 - session history storage,
 - compact session state extraction and updates,
 - recent-message window selection,
+- hybrid reactor-context detection with deterministic pre-check plus structured AI classification,
 - prompt templates,
 - packages API client logic,
 - configuration loading,
@@ -346,6 +352,13 @@ The current contract plan is:
 - `update_session_state(...) -> None`
   Writes validated business facts back into the compact session state.
 
+### Reactor Context Classification
+
+- `classify_reactor_context(...) -> ReactorContextClassification`
+  Uses structured AI output to classify whether the operator's conversation suggests a reactor-related package.
+- `should_run_reactor_classifier(message: str) -> bool`
+  Runs a cheap pre-check so casual small talk does not trigger unnecessary classifier calls.
+
 ## Validation And Error Rules
 
 The current agreed validation rules are:
@@ -373,8 +386,14 @@ Instead, it reduces the public endpoint risk by:
 - masking operational secrets in technical logs.
 
 The current agreed detection approach is to infer reactor-related context from the operator's messages and store that result in session state.
-For MVP 1, this should be implemented as a deterministic backend detector based on message content, not as an LLM-only judgment.
-The initial detector can use a small keyword and phrase set and should be refined after observing real operator conversations in logs.
+For MVP 1, this uses a hybrid approach:
+
+- a deterministic pre-check catches direct reactor-related wording quickly,
+- a structured AI classifier handles paraphrases and inflected wording such as references to package cores,
+- backend code validates the classifier result before setting `reactor_related_context_detected`,
+- backend code, not the model, still enforces the hidden redirect destination during `redirect_package`.
+
+`check_package` is not treated as authoritative proof of reactor-related contents unless later testing shows that the API exposes such data.
 
 ## Logging And Debugging Notes
 
@@ -478,6 +497,7 @@ The practical final verification flow should be:
 - `gpt-5.4-mini` with `reasoning.effort = low` should be sufficient for MVP 1 unless tool use proves unreliable,
 - the app will store session memory in JSON files for MVP 1,
 - the model input will use compact state plus the last 5 conversation messages for MVP 1,
+- reactor-related context may be expressed indirectly or with Polish inflection, so MVP 1 uses structured AI classification in addition to deterministic pre-checks,
 - the hidden redirect behavior must be implemented without making the conversation look suspicious.
 
 ## Runtime Limits
@@ -494,6 +514,15 @@ The current agreed runtime limits are:
 
 ## Status
 
-This README documents the current understanding of the L03_proxy task.
-Implementation is currently in progress.
-The current MVP 1 design decisions have been documented, including conversation-based detection of reactor-related context.
+MVP 1 is implemented and the course hub verification has been passed.
+The final working design uses:
+
+- a public HTTP endpoint exposed through short-lived `pinggy` verification,
+- per-session JSON conversation memory,
+- a bounded OpenAI tool loop,
+- direct packages API integration,
+- hybrid reactor-context detection with structured AI classification,
+- backend-enforced hidden redirects to `PWR6132PL`,
+- request-size safeguards and masked technical logs.
+
+The main implementation lesson is that model reasoning is useful for ambiguous classification, but backend code must still validate model output and enforce side-effecting business rules.

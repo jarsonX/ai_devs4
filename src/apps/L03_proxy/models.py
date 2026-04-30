@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 
 # This helper validates one required non-empty string field from dictionary payloads.
@@ -225,3 +225,35 @@ class AgentRunResult:
     assistant_message: str
     updated_state: SessionState
     tool_results: list[ToolExecutionResult] = field(default_factory=list)
+
+
+# This model stores one validated AI classification of reactor-related context.
+@dataclass(frozen=True)
+class ReactorContextClassification:
+    reactor_related: bool
+    confidence: Literal["low", "medium", "high"]
+    reason: str
+
+    @classmethod
+    # This helper validates the structured classifier response from the model.
+    def from_dict(cls, payload: dict[str, Any]) -> "ReactorContextClassification":
+        reactor_related = payload.get("reactor_related")
+        confidence = payload.get("confidence")
+        reason = payload.get("reason")
+
+        if not isinstance(reactor_related, bool):
+            raise ValueError("reactor_related must be a boolean.")
+        if confidence not in {"low", "medium", "high"}:
+            raise ValueError("confidence must be one of: low, medium, high.")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string.")
+
+        return cls(
+            reactor_related=reactor_related,
+            confidence=confidence,
+            reason=reason.strip(),
+        )
+
+    # This helper checks whether the backend may trust this classification enough to set the flag.
+    def should_activate_reactor_flag(self) -> bool:
+        return self.reactor_related and self.confidence in {"medium", "high"}

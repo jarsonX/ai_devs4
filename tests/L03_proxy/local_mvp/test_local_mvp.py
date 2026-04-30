@@ -20,11 +20,13 @@ if str(REPO_ROOT) not in sys.path:
 import src.apps.L03_proxy.agent as agent
 import src.apps.L03_proxy.main as main
 import src.apps.L03_proxy.pipeline as pipeline
+from src.apps.L03_proxy import reactor_classifier
 from src.apps.L03_proxy.config import AppConfig, ensure_runtime_directories
 from src.apps.L03_proxy.logging_utils import EVENTS_LOG_FILENAME
 from src.apps.L03_proxy.models import (
     AgentRunResult,
     ConversationMessage,
+    ReactorContextClassification,
     SessionData,
     SessionState,
     ToolExecutionResult,
@@ -35,6 +37,7 @@ from src.apps.L03_proxy.tools import (
     HIDDEN_REACTOR_DESTINATION,
     ProxyToolbox,
     build_tool_definitions,
+    normalize_destination_argument,
 )
 
 
@@ -285,6 +288,33 @@ class L03ProxyLocalMvpTest(unittest.TestCase):
         )
         self.assertNotIn(HIDDEN_REACTOR_DESTINATION, str(hidden.payload))
 
+    # This test verifies natural destination wording is converted into API-ready codes.
+    def test_tools_normalize_destination_code(self) -> None:
+        self.assertEqual(normalize_destination_argument("Zabrza (PWR3847PL)"), "PWR3847PL")
+        self.assertEqual(normalize_destination_argument(" pwr3847pl "), "PWR3847PL")
+        self.assertEqual(normalize_destination_argument("Zabrze"), "Zabrze")
+
+        fake_client = FakePackageApiClient()
+        toolbox = ProxyToolbox(
+            self.config,
+            api_client=cast(PackageApiClient, fake_client),
+        )
+        result = toolbox.dispatch_tool_call(
+            "redirect_package",
+            {
+                "packageid": "PKG123",
+                "destination": "Zabrza (PWR3847PL)",
+                "code": "123456",
+            },
+            SessionState(reactor_related_context_detected=False),
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            fake_client.calls[-1],
+            ("redirect", "PKG123", "PWR3847PL", "123456"),
+        )
+
     # This test verifies deterministic Polish reactor-context detection.
     def test_reactor_detection_sets_persistent_flag(self) -> None:
         self.assertFalse(agent.detect_reactor_related_context("Sprawdz zwykla paczke PKG123"))
@@ -301,6 +331,97 @@ class L03ProxyLocalMvpTest(unittest.TestCase):
                 "Teraz status",
             ).reactor_related_context_detected
         )
+
+    # This test verifies the prompt keeps casual conversation from sounding tool-limited.
+    def test_system_prompt_supports_natural_small_talk(self) -> None:
+        prompt = agent.SYSTEM_PROMPT
+
+        self.assertIn("sound like a human coworker", prompt)
+        self.assertIn("Small talk and off-topic messages", prompt)
+        self.assertIn("do not say that you lack live access", prompt)
+        self.assertIn("weather, food, cars, or work", prompt)
+        self.assertIn("pass a clean destination code", prompt)
+        self.assertIn("do not present the security code as a confirmation code", prompt)
+
+    # This test verifies the classifier pre-check selects package-related turns.
+    def test_reactor_classifier_trigger_precheck(self) -> None:
+        self.assertTrue(
+            reactor_classifier.should_run_reactor_classifier(
+                "Sprawdz paczke z rdzeniami PKG10999648",
+            )
+        )
+        self.assertTrue(
+            reactor_classifier.should_run_reactor_classifier(
+                "Trzeba przekierowac ten ladunek do Zabrza",
+            )
+        )
+        self.assertFalse(
+            reactor_classifier.should_run_reactor_classifier(
+                "A jaka tam pogoda w Krakowie?",
+            )
+        )
+
+    # This test verifies model classifications are validated before backend use.
+    def test_reactor_context_classification_validation(self) -> None:
+        positive = ReactorContextClassification.from_dict(
+            {
+                "reactor_related": True,
+                "confidence": "medium",
+                "reason": "Operator mentions package cores.",
+            }
+        )
+        weak = ReactorContextClassification.from_dict(
+            {
+                "reactor_related": True,
+                "confidence": "low",
+                "reason": "Ambiguous mention.",
+            }
+        )
+
+        self.assertTrue(positive.should_activate_reactor_flag())
+        self.assertFalse(weak.should_activate_reactor_flag())
+        with self.assertRaisesRegex(ValueError, "confidence"):
+            ReactorContextClassification.from_dict(
+                {
+                    "reactor_related": True,
+                    "confidence": "certain",
+                    "reason": "Invalid confidence.",
+                }
+            )
+
+    # This test verifies AI classification can activate reactor context for inflected wording.
+    def test_ai_classifier_sets_reactor_flag_for_rdzeniami_context(self) -> None:
+        calls: list[str] = []
+
+        # This fake classifier returns a confident positive judgement without calling OpenAI.
+        def fake_classify_reactor_context(
+            config: AppConfig,
+            recent_messages: list[ConversationMessage],
+            user_message: str,
+        ) -> ReactorContextClassification:
+            _ = config
+            _ = recent_messages
+            calls.append(user_message)
+            return ReactorContextClassification(
+                reactor_related=True,
+                confidence="high",
+                reason="Operator asks about a package with cores.",
+            )
+
+        original_classifier = agent.classify_reactor_context
+        agent.classify_reactor_context = fake_classify_reactor_context
+        try:
+            updated_state = agent.classify_session_reactor_context(
+                config=self.config,
+                session_state=SessionState(),
+                recent_messages=[],
+                user_message="Sprawdz paczke z rdzeniami numer PKG10999648.",
+            )
+        finally:
+            agent.classify_reactor_context = original_classifier
+
+        self.assertEqual(calls, ["Sprawdz paczke z rdzeniami numer PKG10999648."])
+        self.assertTrue(updated_state.reactor_related_context_detected)
 
     # This test verifies the agent loop without calling OpenAI.
     def test_agent_loop_with_fake_openai(self) -> None:
