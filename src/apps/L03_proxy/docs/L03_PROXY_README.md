@@ -6,6 +6,36 @@ Its goal is to expose a public HTTP endpoint that behaves like a conversation-aw
 The task scenario is simulated by the course.
 There is no real-world interception or manipulation involved outside the exercise itself.
 
+## Table Of Contents
+
+- [Purpose](#purpose)
+- [Current Business Goal](#current-business-goal)
+- [Role Of The LLM](#role-of-the-llm)
+- [Model Selection](#model-selection)
+- [Expected HTTP Contract](#expected-http-contract)
+- [External Package API](#external-package-api)
+- [Workflow Stages](#workflow-stages)
+- [Responsibility Split](#responsibility-split)
+- [Planned Tools](#planned-tools)
+- [Tool Exposure Strategy](#tool-exposure-strategy)
+- [Planned Agent State](#planned-agent-state)
+- [Stage Completion Rules](#stage-completion-rules)
+- [Secret Redirect Rule](#secret-redirect-rule)
+- [Planned Stage Flow](#planned-stage-flow)
+- [Planned File Structure](#planned-file-structure)
+- [File Responsibilities](#file-responsibilities)
+- [Boundary Rules](#boundary-rules)
+- [Planned Internal Contents](#planned-internal-contents)
+- [Planned Functions And Contracts](#planned-functions-and-contracts)
+- [Validation And Error Rules](#validation-and-error-rules)
+- [Logging And Debugging Notes](#logging-and-debugging-notes)
+- [Deployment Plan](#deployment-plan)
+- [Hub Verification Submission](#hub-verification-submission)
+- [Verification Plan](#verification-plan)
+- [Assumptions](#assumptions)
+- [Runtime Limits](#runtime-limits)
+- [Status](#status)
+
 ## Purpose
 
 The app is meant for learning:
@@ -324,11 +354,23 @@ The current agreed validation rules are:
 - the input payload must contain `msg`,
 - each `sessionID` must be handled independently,
 - the HTTP layer should return `400` for invalid request payloads,
+- the HTTP layer should return `413` when the request body exceeds the configured size limit,
+- oversized `sessionID` and `msg` fields should be rejected before model or tool execution,
 - the tool loop must use an explicit maximum iteration limit,
 - package API responses should be validated before use,
 - missing business inputs such as `packageid` or security `code` should trigger a natural follow-up question instead of an invalid tool call,
 - redirect confirmation should be preserved and returned naturally to the operator,
 - the operator-facing response must not reveal the hidden redirect target.
+
+The current public-exposure safeguards are intentionally narrow so they do not break the course contract that multiple independent `sessionID` values may be used.
+The app does not allowlist a single session ID.
+Instead, it reduces the public endpoint risk by:
+
+- keeping pinggy exposure short-lived during final verification,
+- rejecting oversized HTTP request bodies before JSON parsing,
+- rejecting oversized `sessionID` and `msg` values before model calls or tool execution,
+- keeping operational secrets such as API keys and real endpoint URLs in `.env`,
+- masking operational secrets in technical logs.
 
 The current agreed detection approach is to infer reactor-related context from the operator's messages and store that result in session state.
 For MVP 1, this should be implemented as a deterministic backend detector based on message content, not as an LLM-only judgment.
@@ -363,13 +405,13 @@ The task description suggests:
 - `pinggy`,
 - VPS hosting such as Mikr.us / Frog.
 
-The exact deployment path is still TBD.
+The selected deployment path is `pinggy` for short-lived public verification.
 
 ## Hub Verification Submission
 
 Once the public endpoint is reachable, the app should be submitted to the configured hub verification endpoint from:
 
-`HUB_VERIFY_URL`
+`L03_VERIFY_API_URL`
 
 The task name must be:
 
@@ -379,7 +421,7 @@ The expected verification payload is:
 
 ```json
 {
-  "apikey": "<HUB_API_KEY>",
+  "apikey": "<AI_DEVS_API_KEY>",
   "task": "proxy",
   "answer": {
     "url": "<PUBLIC_ENDPOINT_URL>",
@@ -392,8 +434,22 @@ Important submission details:
 
 - `url` must be the full public URL of the HTTP endpoint exposed for the operator,
 - `sessionID` may be any chosen identifier, but the hub will use it as the conversation session ID during testing,
-- `HUB_VERIFY_URL`, `HUB_API_KEY`, and any real endpoint addresses should be stored outside documentation, for example in `.env`,
+- `L03_VERIFY_API_URL`, `AI_DEVS_API_KEY`, `L03_PROXY_API_URL`, and any real endpoint addresses should be stored outside documentation, for example in `.env`,
 - the public tunnel or deployed server must stay available while the hub runs the verification flow.
+
+The current submission helper is:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L03_proxy.submit_verification "https://your-public-pinggy-url/"
+```
+
+Use `--session-id` when the verification should reuse a specific hub session:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L03_proxy.submit_verification "https://your-public-pinggy-url/" --session-id proxy-final-test-001
+```
+
+The script prints a masked payload, HTTP status, and the full hub response.
 
 ## Verification Plan
 
@@ -408,9 +464,9 @@ The current minimum verification checklist is:
 The practical final verification flow should be:
 
 1. run the HTTP app locally and confirm it accepts `{ "sessionID", "msg" }` JSON input and returns `{ "msg" }`,
-2. expose the app publicly through `ngrok`, `pinggy`, or VPS hosting,
+2. expose the app publicly through `pinggy`,
 3. confirm the public URL points to the real API endpoint path expected by the task,
-4. submit the public URL and chosen `sessionID` to `HUB_VERIFY_URL`,
+4. submit the public URL and chosen `sessionID` to `L03_VERIFY_API_URL`,
 5. keep the public endpoint alive while the hub conducts the operator conversation test,
 6. verify from logs that the same `sessionID` preserves conversation state across multiple requests,
 7. confirm that successful redirect flows return the `confirmation` code back to the operator naturally.
@@ -432,6 +488,9 @@ The current agreed runtime limits are:
 - `llm_timeout_seconds = 30`
 - `external_api_timeout_seconds = 10`
 - `total_request_timeout_seconds = 45`
+- `max_request_bytes = 32768`
+- `max_session_id_length = 128`
+- `max_msg_length = 4000`
 
 ## Status
 

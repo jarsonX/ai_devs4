@@ -75,8 +75,20 @@ When a step is changed, update this section first so the plan and the work stay 
     Use `Verification Checklist` as the required local verification scope.
 
 14. Expose the application publicly and perform end-to-end validation.
-    Publish the local app through a tunnel or VPS, test the real endpoint manually, and only then submit it to the course verification hub.
-    Keep the real verification URL and API key in configuration such as `.env` entries like `HUB_VERIFY_URL` and `HUB_API_KEY`, not in markdown files.
+    Publish the local app through pinggy, test the real endpoint manually, and only then submit it to the course verification hub.
+    Keep the real verification URL and API key in configuration through `.env` entries:
+    - `AI_DEVS_API_KEY` for the hub API key,
+    - `L03_PROXY_API_URL` for the packages API,
+    - `L03_VERIFY_API_URL` for the hub verification endpoint.
+    Submit the public endpoint with:
+    ```powershell
+    .\venv\Scripts\python.exe -m src.apps.L03_proxy.submit_verification "https://your-public-pinggy-url/"
+    ```
+    Use `--session-id` when a repeatable hub session ID is useful:
+    ```powershell
+    .\venv\Scripts\python.exe -m src.apps.L03_proxy.submit_verification "https://your-public-pinggy-url/" --session-id proxy-final-test-001
+    ```
+    The script must print the masked payload, HTTP status, and full hub response.
     The first debugging round should happen locally, not on the public URL.
     Public exposure is not required for most development work:
     - internal modules such as session handling, reactor-context detection, tool dispatch, and API integration can be tested without any HTTP server,
@@ -93,6 +105,9 @@ When a step is changed, update this section first so the plan and the work stay 
 - LLM timeout: `30s`
 - external API timeout: `10s`
 - total request timeout: `45s`
+- max HTTP request body: `32768 bytes`
+- max `sessionID` length: `128 characters`
+- max `msg` length: `4000 characters`
 - external packages API integration: direct application client in `package_api_client.py`
 
 ## Design Guardrails
@@ -109,6 +124,7 @@ When a step is changed, update this section first so the plan and the work stay 
 - Persist full conversation transcripts for debugging, but do not send the full transcript to the LLM by default.
 - Keep technical logs separate from conversation transcripts.
 - Mask secrets, API keys, and security codes in technical logs.
+- Keep public endpoint exposure short-lived and reject oversized requests before model or tool execution.
 - Do not add MCP to MVP 1 unless a concrete implementation problem justifies the extra complexity.
 - MCP may be revisited later as a possible MVP 2 refactor if tool portability becomes useful.
 
@@ -152,6 +168,7 @@ When a step is changed, update this section first so the plan and the work stay 
 
 - Before public exposure:
   Confirm the local endpoint works, logs are safe, `.env` contains real secrets, and documentation does not contain real operational values.
+  Confirm oversized HTTP bodies and oversized request fields are rejected before model or tool execution.
 
 - During public verification:
   Keep the tunnel or deployed server alive while the hub runs the operator conversation test.

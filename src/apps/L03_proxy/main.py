@@ -6,12 +6,19 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from .config import ensure_runtime_directories, get_config
+from .config import DEFAULT_MAX_REQUEST_BYTES, ensure_runtime_directories, get_config
 from .pipeline import handle_request
+
+
+# This error represents an HTTP request body that exceeds the configured limit.
+class RequestBodyTooLargeError(ValueError):
+    pass
 
 
 # This HTTP handler exposes the proxy pipeline as a JSON POST endpoint.
 class ProxyRequestHandler(BaseHTTPRequestHandler):
+    max_request_bytes = DEFAULT_MAX_REQUEST_BYTES
+
     # This method handles the operator-facing proxy request.
     def do_POST(self) -> None:
         if self.path != "/":
@@ -21,6 +28,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         try:
             payload = self.read_json_body()
             response_payload = handle_request(payload)
+        except RequestBodyTooLargeError as error:
+            self.send_json(413, {"error": str(error)})
+            return
         except ValueError as error:
             self.send_json(400, {"error": str(error)})
             return
@@ -44,6 +54,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         if content_length <= 0:
             raise ValueError("Request body cannot be empty.")
+        if content_length > self.max_request_bytes:
+            raise RequestBodyTooLargeError(
+                f"Request body cannot be larger than {self.max_request_bytes} bytes."
+            )
 
         raw_body = self.rfile.read(content_length)
         try:
@@ -75,6 +89,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 def run_app() -> None:
     config = get_config()
     ensure_runtime_directories(config)
+    ProxyRequestHandler.max_request_bytes = config.max_request_bytes
 
     server = ThreadingHTTPServer(
         (config.app_host, config.app_port),

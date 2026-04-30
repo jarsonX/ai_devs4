@@ -7,7 +7,11 @@ from typing import Any
 
 
 # This helper validates one required non-empty string field from dictionary payloads.
-def get_required_string(payload: dict[str, Any], key: str) -> str:
+def get_required_string(
+    payload: dict[str, Any],
+    key: str,
+    max_length: int | None = None,
+) -> str:
     value = payload.get(key)
     if not isinstance(value, str):
         raise ValueError(f"{key} must be a string.")
@@ -15,6 +19,8 @@ def get_required_string(payload: dict[str, Any], key: str) -> str:
     cleaned_value = value.strip()
     if not cleaned_value:
         raise ValueError(f"{key} cannot be empty.")
+    if max_length is not None and len(cleaned_value) > max_length:
+        raise ValueError(f"{key} cannot be longer than {max_length} characters.")
 
     return cleaned_value
 
@@ -51,10 +57,19 @@ class ProxyRequest:
 
     @classmethod
     # This helper converts a raw request payload into the internal request model.
-    def from_dict(cls, payload: dict[str, Any]) -> "ProxyRequest":
+    def from_dict(
+        cls,
+        payload: dict[str, Any],
+        max_session_id_length: int | None = None,
+        max_msg_length: int | None = None,
+    ) -> "ProxyRequest":
         return cls(
-            session_id=get_required_string(payload, "sessionID"),
-            msg=get_required_string(payload, "msg"),
+            session_id=get_required_string(
+                payload,
+                "sessionID",
+                max_session_id_length,
+            ),
+            msg=get_required_string(payload, "msg", max_msg_length),
         )
 
     # This helper converts the internal request model back into API field names.

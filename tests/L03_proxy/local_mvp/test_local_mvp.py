@@ -43,9 +43,11 @@ def make_config(root: Path, recent_message_limit: int = 2) -> AppConfig:
     return AppConfig(
         ai_devs_api_key="test-ai-devs-key",
         openai_api_key="test-openai-key",
+        task_name="proxy",
         openai_model="test-model",
         openai_reasoning_effort="low",
         proxy_api_url="https://example.invalid/packages",
+        verify_api_url="https://example.invalid/verify",
         app_host="127.0.0.1",
         app_port=3000,
         recent_message_limit=recent_message_limit,
@@ -53,6 +55,9 @@ def make_config(root: Path, recent_message_limit: int = 2) -> AppConfig:
         llm_timeout_seconds=30.0,
         external_api_timeout_seconds=10.0,
         total_request_timeout_seconds=45.0,
+        max_request_bytes=1024,
+        max_session_id_length=16,
+        max_msg_length=64,
         data_dir=root,
         sessions_dir=root / "sessions",
         logs_dir=root / "logs",
@@ -418,6 +423,18 @@ class L03ProxyLocalMvpTest(unittest.TestCase):
                 )[0],
                 400,
             )
+            self.assertEqual(
+                request_post(
+                    url,
+                    json.dumps(
+                        {
+                            "sessionID": "s",
+                            "msg": "x" * (main.ProxyRequestHandler.max_request_bytes + 1),
+                        }
+                    ).encode("utf-8"),
+                )[0],
+                413,
+            )
 
             request = urllib.request.Request(url, method="GET")
             with self.assertRaises(urllib.error.HTTPError) as error_context:
@@ -428,6 +445,20 @@ class L03ProxyLocalMvpTest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
             main.handle_request = original_handle_request
+
+    # This test verifies request field limits before any model or tool execution.
+    def test_pipeline_rejects_oversized_request_fields(self) -> None:
+        with self.assertRaisesRegex(ValueError, "sessionID cannot be longer"):
+            pipeline.handle_request(
+                {"sessionID": "s" * 17, "msg": "hello"},
+                config=self.config,
+            )
+
+        with self.assertRaisesRegex(ValueError, "msg cannot be longer"):
+            pipeline.handle_request(
+                {"sessionID": "s", "msg": "x" * 65},
+                config=self.config,
+            )
 
     # This test verifies technical logs are written and sensitive values are masked.
     def test_logging_masks_sensitive_values(self) -> None:

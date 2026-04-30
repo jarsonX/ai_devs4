@@ -21,15 +21,20 @@ DEFAULT_MAX_TOOL_ITERATIONS = 5
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 DEFAULT_EXTERNAL_API_TIMEOUT_SECONDS = 10.0
 DEFAULT_TOTAL_REQUEST_TIMEOUT_SECONDS = 45.0
+DEFAULT_MAX_REQUEST_BYTES = 32_768
+DEFAULT_MAX_SESSION_ID_LENGTH = 128
+DEFAULT_MAX_MSG_LENGTH = 4_000
 
 
 @dataclass(frozen=True)
 class AppConfig:
     ai_devs_api_key: str
     openai_api_key: str
+    task_name: str
     openai_model: str
     openai_reasoning_effort: str
     proxy_api_url: str
+    verify_api_url: str
     app_host: str
     app_port: int
     recent_message_limit: int
@@ -37,6 +42,9 @@ class AppConfig:
     llm_timeout_seconds: float
     external_api_timeout_seconds: float
     total_request_timeout_seconds: float
+    max_request_bytes: int
+    max_session_id_length: int
+    max_msg_length: int
     data_dir: Path
     sessions_dir: Path
     logs_dir: Path
@@ -60,9 +68,11 @@ def get_config() -> AppConfig:
     return AppConfig(
         ai_devs_api_key=get_required_env("AI_DEVS_API_KEY"),
         openai_api_key=get_required_env("OPENAI_API_KEY"),
+        task_name="proxy",
         openai_model=DEFAULT_OPENAI_MODEL,
         openai_reasoning_effort=DEFAULT_REASONING_EFFORT,
         proxy_api_url=get_required_env("L03_PROXY_API_URL"),
+        verify_api_url=get_required_env("L03_VERIFY_API_URL"),
         app_host=DEFAULT_APP_HOST,
         app_port=DEFAULT_APP_PORT,
         recent_message_limit=DEFAULT_RECENT_MESSAGE_LIMIT,
@@ -70,6 +80,9 @@ def get_config() -> AppConfig:
         llm_timeout_seconds=DEFAULT_LLM_TIMEOUT_SECONDS,
         external_api_timeout_seconds=DEFAULT_EXTERNAL_API_TIMEOUT_SECONDS,
         total_request_timeout_seconds=DEFAULT_TOTAL_REQUEST_TIMEOUT_SECONDS,
+        max_request_bytes=DEFAULT_MAX_REQUEST_BYTES,
+        max_session_id_length=DEFAULT_MAX_SESSION_ID_LENGTH,
+        max_msg_length=DEFAULT_MAX_MSG_LENGTH,
         data_dir=data_dir,
         sessions_dir=sessions_dir,
         logs_dir=logs_dir,

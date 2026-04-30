@@ -44,7 +44,11 @@ def handle_request(
     runtime_config = config or get_config()
     ensure_runtime_directories(runtime_config)
 
-    request = ProxyRequest.from_dict(payload)
+    request = ProxyRequest.from_dict(
+        payload,
+        max_session_id_length=runtime_config.max_session_id_length,
+        max_msg_length=runtime_config.max_msg_length,
+    )
     append_log_event(
         runtime_config,
         "request_received",
