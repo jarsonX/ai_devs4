@@ -14,36 +14,42 @@ load_dotenv()
 class AppConfig:
     ai_devs_api_key: str
     openai_api_key: str
+    task_name: str
+    people_csv_url: str
+    verify_api_url: str
     openai_model: str
-    max_agent_iterations: int
     data_dir: Path
-    data_people_path: Path
+    input_dir: Path
+    input_csv_path: Path
     output_dir: Path
     output_json_path: Path
-    access_level_api_url: str   
 
 
 def get_required_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
         raise ValueError(f"{name} is missing.")
-    
+
     return value
 
 
 def get_config() -> AppConfig:
-    data_dir = Path("data") / "EDU1"
+    data_dir = Path("data") / "L1_people"
+    input_dir = data_dir / "input"
+    input_csv_path = input_dir / "people.csv"
     output_dir = data_dir / "output"
-    data_people_path = data_dir / "input" / "data_people.json"
+    output_json_path = output_dir / "verification_result.json"
 
     return AppConfig(
         ai_devs_api_key=get_required_env("AI_DEVS_API_KEY"),
         openai_api_key=get_required_env("OPENAI_API_KEY"),
-        openai_model="gpt-4o-mini",
-        max_agent_iterations=8,
+        task_name="people",
+        people_csv_url=get_required_env("L1_PEOPLE_CSV_URL"),
+        verify_api_url=get_required_env("L1_VERIFY_API_URL"),
+        openai_model="gpt-4.1-mini",
         data_dir=data_dir,
-        data_people_path=data_people_path,
+        input_dir=input_dir,
+        input_csv_path=input_csv_path,
         output_dir=output_dir,
-        output_json_path=output_dir / "app_status.json",
-        access_level_api_url=get_required_env("L2_ACCESS_LEVEL_API_URL"),
+        output_json_path=output_json_path
     )

@@ -1,6 +1,6 @@
 # EDU1
 
-EDU1 is an educational app inspired by `L02_findhim`.
+EDU1 is an educational app inspired by `L2_findhim`.
 Its goal is to explain the core idea of an agent-style application without the full complexity of the reference app.
 
 ## Purpose
@@ -14,7 +14,7 @@ The app is meant for learning:
 - keeping business logic simple while still using a staged agent workflow,
 - validating model output before using it.
 
-This app should mirror selected ideas from `L02_findhim`, but in a much smaller and easier-to-follow form.
+This app should mirror selected ideas from `L2_findhim`, but in a much smaller and easier-to-follow form.
 
 ## Current Business Goal
 
@@ -123,7 +123,7 @@ Instead, each model-driven stage should expose only the tools needed for that st
 - `selection`: `validate_selected_city`, `find_person_by_city`
 - `finalize`: `get_access_level`, `build_final_result`
 
-This follows the learning goal taken from `L02_findhim`:
+This follows the learning goal taken from `L2_findhim`:
 - keep the workflow staged,
 - reduce unnecessary tool choices,
 - make each step easier to understand and debug.
@@ -181,7 +181,7 @@ The current high-level flow is:
    - fetch `accessLevel`
    - build the final result
 
-This preserves the staged-agent pattern from `L02_findhim` in a simpler form.
+This preserves the staged-agent pattern from `L2_findhim` in a simpler form.
 
 ## Planned File Structure
 

@@ -11,7 +11,7 @@ https://www.aidevs.pl/
 
 ## Repository structure
 
-Applications created to solve AI_devs course tasks are located in the `src/apps/` directory. In most cases, each task has its own dedicated application directory, for example `src/apps/L01_people`, containing the code and supporting modules created specifically for that assignment.
+Applications created to solve AI_devs course tasks are located in the `src/apps/` directory. In most cases, each task has its own dedicated application directory, for example `src/apps/L1_people`, containing the code and supporting modules created specifically for that assignment.
 
 The repository also includes applications labeled as `EDU#`. These are not direct course tasks, but rather educational side projects and author experiments. They were usually created as simplified, focused exercises to better understand a specific concept, mechanism, or implementation detail when a topic needed additional hands-on practice.
 

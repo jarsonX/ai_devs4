@@ -1,3 +1,5 @@
+"""This file loads app settings such as API keys, URLs, paths, and model configuration."""
+
 from __future__ import annotations
 
 import os
@@ -14,36 +16,43 @@ load_dotenv()
 class AppConfig:
     ai_devs_api_key: str
     openai_api_key: str
+    task_name: str
     openai_model: str
     max_agent_iterations: int
     data_dir: Path
-    data_people_path: Path
     output_dir: Path
     output_json_path: Path
-    access_level_api_url: str   
+    suspects_source_path: Path
+    power_plants_url: str
+    location_api_url: str
+    access_level_api_url: str
+    verify_api_url: str
 
 
 def get_required_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
         raise ValueError(f"{name} is missing.")
-    
+
     return value
 
 
 def get_config() -> AppConfig:
-    data_dir = Path("data") / "EDU1"
+    data_dir = Path("data") / "L2_findhim"
     output_dir = data_dir / "output"
-    data_people_path = data_dir / "input" / "data_people.json"
 
     return AppConfig(
         ai_devs_api_key=get_required_env("AI_DEVS_API_KEY"),
         openai_api_key=get_required_env("OPENAI_API_KEY"),
-        openai_model="gpt-4o-mini",
-        max_agent_iterations=8,
+        task_name="findhim",
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini").strip(),
+        max_agent_iterations=int(os.getenv("L2_MAX_AGENT_ITERATIONS", "12")),
         data_dir=data_dir,
-        data_people_path=data_people_path,
         output_dir=output_dir,
         output_json_path=output_dir / "app_status.json",
+        suspects_source_path=Path("data") / "L1_people" / "output" / "verification_result.json",
+        power_plants_url=get_required_env("L2_POWER_PLANTS_URL"),
+        location_api_url=get_required_env("L2_LOCATION_API_URL"),
         access_level_api_url=get_required_env("L2_ACCESS_LEVEL_API_URL"),
+        verify_api_url=get_required_env("L2_VERIFY_API_URL"),
     )
