@@ -1,7 +1,7 @@
 ## Project Context
 
 - This repository is a learning workspace for the AI_devs course; learning is the primary goal.
-- Treat `course_materials/` as the main local conceptual reference and the existing codebase as the source of truth for current behavior.
+- Treat `_agent/references/` as the main local conceptual reference and the existing codebase as the source of truth for current behavior.
 
 ## Communication
 
@@ -24,12 +24,13 @@
 - Outside `.env`, use masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - Treat files listed in `.gitignore` as potentially secret-bearing and handle them with extra caution.
 
-## Course Materials
+## Agent References
 
-- Use `course_materials/INDEX.md` first to find the best 1-3 relevant lesson files.
-- Open more lesson files only when needed for implementation, explanation, or a design decision.
-- Align solutions, vocabulary, and explanations with the course approach when it improves learning and clarity.
-- Mention lesson files only when they actually influenced the solution; explain any meaningful deviation and its trade-off.
+- Agent reference files are curated operational notes derived from course learning material and adapted for agent use.
+- Use `_agent/references/INDEX.md` first to find the best 1-3 relevant agent reference files.
+- Open more reference files only when needed for implementation, explanation, or a design decision.
+- Align solutions, vocabulary, and explanations with the reference files when it improves learning and clarity.
+- Mention reference files only when they actually influenced the solution; explain any meaningful deviation and its trade-off.
 
 ## Execution Workflow
 
