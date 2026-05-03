@@ -15,6 +15,8 @@ Applications created to solve AI_devs course tasks are located in the `src/apps/
 
 The repository also includes applications labeled as `EDU#`. These are not direct course tasks, but rather educational side projects and author experiments. They were usually created as simplified, focused exercises to better understand a specific concept, mechanism, or implementation detail when a topic needed additional hands-on practice.
 
+Application documentation is kept close to the code in each app's `docs/` directory. README files describe the current purpose, workflow, configuration, run command, module structure, and verification approach for an app. Some apps also include DEV_NOTES files with working context such as implementation history, debugging lessons, trade-offs, open questions, future work, and lessons learned.
+
 ## Disclaimers
 
 ### Course & Content
