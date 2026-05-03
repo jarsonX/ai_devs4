@@ -54,5 +54,5 @@ def get_config() -> AppConfig:
         power_plants_url=get_required_env("L2_POWER_PLANTS_URL"),
         location_api_url=get_required_env("L2_LOCATION_API_URL"),
         access_level_api_url=get_required_env("L2_ACCESS_LEVEL_API_URL"),
-        verify_api_url=get_required_env("L2_VERIFY_API_URL"),
+        verify_api_url=get_required_env("HUB_VERIFY_URL"),
     )

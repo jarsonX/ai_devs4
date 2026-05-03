@@ -44,7 +44,7 @@ Secrets and endpoint values are read from `.env`:
 - `AI_DEVS_API_KEY`
 - `OPENAI_API_KEY`
 - `L1_PEOPLE_CSV_URL`
-- `L1_VERIFY_API_URL`
+- `HUB_VERIFY_URL`
 
 Do not commit real values for these variables.
 

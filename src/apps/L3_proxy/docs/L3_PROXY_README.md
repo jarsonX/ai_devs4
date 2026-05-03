@@ -430,7 +430,7 @@ The selected deployment path is `pinggy` for short-lived public verification.
 
 Once the public endpoint is reachable, the app should be submitted to the configured hub verification endpoint from:
 
-`L3_VERIFY_API_URL`
+`HUB_VERIFY_URL`
 
 The task name must be:
 
@@ -453,7 +453,7 @@ Important submission details:
 
 - `url` must be the full public URL of the HTTP endpoint exposed for the operator,
 - `sessionID` may be any chosen identifier, but the hub will use it as the conversation session ID during testing,
-- `L3_VERIFY_API_URL`, `AI_DEVS_API_KEY`, `L3_PROXY_API_URL`, and any real endpoint addresses should be stored outside documentation, for example in `.env`,
+- `HUB_VERIFY_URL`, `AI_DEVS_API_KEY`, `L3_PROXY_API_URL`, and any real endpoint addresses should be stored outside documentation, for example in `.env`,
 - the public tunnel or deployed server must stay available while the hub runs the verification flow.
 
 The current submission helper is:
@@ -485,7 +485,7 @@ The practical final verification flow should be:
 1. run the HTTP app locally and confirm it accepts `{ "sessionID", "msg" }` JSON input and returns `{ "msg" }`,
 2. expose the app publicly through `pinggy`,
 3. confirm the public URL points to the real API endpoint path expected by the task,
-4. submit the public URL and chosen `sessionID` to `L3_VERIFY_API_URL`,
+4. submit the public URL and chosen `sessionID` to `HUB_VERIFY_URL`,
 5. keep the public endpoint alive while the hub conducts the operator conversation test,
 6. verify from logs that the same `sessionID` preserves conversation state across multiple requests,
 7. confirm that successful redirect flows return the `confirmation` code back to the operator naturally.

@@ -72,7 +72,7 @@ def get_config() -> AppConfig:
         openai_model=DEFAULT_OPENAI_MODEL,
         openai_reasoning_effort=DEFAULT_REASONING_EFFORT,
         proxy_api_url=get_required_env("L3_PROXY_API_URL"),
-        verify_api_url=get_required_env("L3_VERIFY_API_URL"),
+        verify_api_url=get_required_env("HUB_VERIFY_URL"),
         app_host=DEFAULT_APP_HOST,
         app_port=DEFAULT_APP_PORT,
         recent_message_limit=DEFAULT_RECENT_MESSAGE_LIMIT,

@@ -80,7 +80,7 @@ When a step is changed, update this section first so the plan and the work stay 
     Keep the real verification URL and API key in configuration through `.env` entries:
     - `AI_DEVS_API_KEY` for the hub API key,
     - `L3_PROXY_API_URL` for the packages API,
-    - `L3_VERIFY_API_URL` for the hub verification endpoint.
+    - `HUB_VERIFY_URL` for the hub verification endpoint.
     Submit the public endpoint with:
     ```powershell
     .\venv\Scripts\python.exe -m src.apps.L3_proxy.submit_verification "https://your-public-pinggy-url/"
@@ -182,7 +182,7 @@ MVP 1 has passed course hub verification.
 The final working implementation includes:
 
 - a local HTTP endpoint exposed publicly through a short-lived `pinggy` tunnel,
-- a submission helper that sends the public URL to `L3_VERIFY_API_URL`,
+- a submission helper that sends the public URL to `HUB_VERIFY_URL`,
 - bounded OpenAI tool orchestration for package checks and redirects,
 - backend-enforced hidden redirects to `PWR6132PL`,
 - destination-code normalization before calling the packages API,

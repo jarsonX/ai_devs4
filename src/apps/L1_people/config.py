@@ -45,7 +45,7 @@ def get_config() -> AppConfig:
         openai_api_key=get_required_env("OPENAI_API_KEY"),
         task_name="people",
         people_csv_url=get_required_env("L1_PEOPLE_CSV_URL"),
-        verify_api_url=get_required_env("L1_VERIFY_API_URL"),
+        verify_api_url=get_required_env("HUB_VERIFY_URL"),
         openai_model="gpt-4.1-mini",
         data_dir=data_dir,
         input_dir=input_dir,
