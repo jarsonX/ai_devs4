@@ -24,6 +24,15 @@
 - Outside `.env`, use masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - Treat files listed in `.gitignore` as potentially secret-bearing and handle them with extra caution.
 
+## App Data Policy
+
+- Application source directories under `src/apps/{APP_NAME}` should contain application code and app documentation only.
+- Runtime files for each app should live under the repository-level `data/{APP_NAME}/` directory.
+- Use clear subdirectories inside `data/{APP_NAME}/`, such as `input/`, `references/`, `output/`, `logs/`, `cache/`, or another name that matches the file purpose.
+- Store app input files, downloaded or curated reference files, generated outputs, verification payloads, run reports, logs, cache files, and similar runtime artifacts in `data/{APP_NAME}/...`, not in `src/apps/{APP_NAME}/...`.
+- Documentation should describe app data paths as repository-root-relative paths, for example `data/{APP_NAME}/input/example.txt` or `data/{APP_NAME}/output/result.json`.
+- Do not store secrets in app data files. If a generated payload would normally include a secret, save only a masked value, omit the secret, or store the secret only in `.env`.
+
 ## App Documentation Policy
 
 - Each app in `src/apps/{APP_NAME}` should keep documentation in `src/apps/{APP_NAME}/docs/`.

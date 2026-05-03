@@ -1,5 +1,5 @@
-.github/
 _agent/references/
+.github/
 data/
 venv/
 .env
