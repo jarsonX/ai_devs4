@@ -1,4 +1,4 @@
-# Human-readable run report builder for the L4 sendit MVP2 Stage 1 pipeline.
+# Human-readable run report builder for the L4 sendit MVP2 Stage 1-2 pipeline.
 
 from src.apps.L4_sendit.L4_sendit_MVP1.models import (
     DeclarationData,
@@ -9,6 +9,8 @@ from src.apps.L4_sendit.L4_sendit_MVP1.models import (
 from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     CommandValidationResult,
     ParsedCommand,
+    ReferenceInventoryItem,
+    SelectedSources,
 )
 
 
@@ -20,8 +22,12 @@ def build_run_report(
     declaration_data: DeclarationData,
     wagon_calculation: WagonCalculation,
     validation_results: list[ValidationResult],
+    reference_inventory: list[ReferenceInventoryItem],
+    selected_sources: SelectedSources,
+    source_selection_validation_results: list[CommandValidationResult],
     loaded_references: list[str],
     model_source: str,
+    source_selection_model_source: str,
 ) -> str:
     return "\n".join(
         [
@@ -46,6 +52,32 @@ def build_run_report(
             *[
                 f"- {validation_result.status}: {validation_result.message}"
                 for validation_result in command_validation_results
+            ],
+            "",
+            "## Stage 2 Source Selection",
+            "",
+            f"- Model source: `{source_selection_model_source}`",
+            f"- Inventory files: `{len(reference_inventory)}`",
+            f"- Selected sources: `{len(selected_sources.selected_sources)}`",
+            f"- Rejected sources: `{len(selected_sources.rejected_sources)}`",
+            f"- Missing sources: `{', '.join(selected_sources.missing_sources) or 'none'}`",
+            f"- Uncertainty notes: `{', '.join(selected_sources.uncertainty_notes) or 'none'}`",
+            "",
+            "### Selected Sources",
+            "",
+            *[
+                (
+                    f"- `{source.path}` ({source.source_type}, {source.intended_use}, "
+                    f"confidence `{source.confidence}`): {source.reason}"
+                )
+                for source in selected_sources.selected_sources
+            ],
+            "",
+            "### Source Selection Validation",
+            "",
+            *[
+                f"- {validation_result.status}: {validation_result.message}"
+                for validation_result in source_selection_validation_results
             ],
             "",
             "## Loaded References",
@@ -79,7 +111,8 @@ def build_run_report(
             "## AI Boundary",
             "",
             "- MVP2 Stage 1 uses AI only to parse the operational command.",
-            "- Source selection, fact extraction, route reasoning, declaration rendering, and Hub submission remain deterministic.",
+            "- MVP2 Stage 2 uses AI only to select local reference sources from a deterministic inventory.",
+            "- Fact extraction, route reasoning, declaration rendering, and Hub submission remain deterministic or outside the current AI boundary.",
             "- Model output is saved for inspection and used only after schema plus semantic validation passes.",
         ]
     )

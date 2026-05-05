@@ -3,6 +3,8 @@
 from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     CommandValidationResult,
     ParsedCommand,
+    ReferenceInventoryItem,
+    SelectedSources,
 )
 
 
@@ -16,6 +18,33 @@ def validate_parsed_command(command: ParsedCommand) -> list[CommandValidationRes
     results.extend(_validate_known_stage_1_expectations(command))
 
     return results
+
+
+# Validate selected sources before any downstream extraction stage can use them.
+def validate_selected_sources(
+    selected_sources: SelectedSources,
+    inventory: list[ReferenceInventoryItem],
+) -> list[CommandValidationResult]:
+    results: list[CommandValidationResult] = []
+    inventory_by_path = {item.path: item for item in inventory}
+
+    results.extend(_validate_selected_source_paths(selected_sources, inventory_by_path))
+    results.extend(_validate_rejected_source_paths(selected_sources, inventory_by_path))
+    results.extend(_validate_required_source_categories(selected_sources))
+    results.extend(_validate_source_selection_lists(selected_sources))
+
+    return results
+
+
+# Raise a clear error when source selection validation has blocking errors.
+def raise_if_source_selection_invalid(validation_results: list[CommandValidationResult]) -> None:
+    error_messages = [
+        validation_result.message
+        for validation_result in validation_results
+        if validation_result.status == "ERROR"
+    ]
+    if error_messages:
+        raise ValueError(f"AI source selector output failed validation: {', '.join(error_messages)}")
 
 
 # Validate that required text fields are populated after schema parsing.
@@ -40,6 +69,134 @@ def _validate_required_text(command: ParsedCommand) -> list[CommandValidationRes
         ]
 
     return [CommandValidationResult(status="OK", message="parsed command has required text fields")]
+
+
+# Validate selected source paths and source types against the deterministic inventory.
+def _validate_selected_source_paths(
+    selected_sources: SelectedSources,
+    inventory_by_path: dict[str, ReferenceInventoryItem],
+) -> list[CommandValidationResult]:
+    results: list[CommandValidationResult] = []
+    seen_paths: set[str] = set()
+
+    for source in selected_sources.selected_sources:
+        if source.path in seen_paths:
+            results.append(
+                CommandValidationResult(
+                    status="ERROR",
+                    message=f"selected source is duplicated: {source.path}",
+                )
+            )
+        seen_paths.add(source.path)
+
+        inventory_item = inventory_by_path.get(source.path)
+        if inventory_item is None:
+            results.append(
+                CommandValidationResult(
+                    status="ERROR",
+                    message=f"selected source is not in local inventory: {source.path}",
+                )
+            )
+            continue
+
+        if source.source_type == inventory_item.source_type:
+            results.append(
+                CommandValidationResult(
+                    status="OK",
+                    message=f"selected source type matches inventory: {source.path}",
+                )
+            )
+        else:
+            results.append(
+                CommandValidationResult(
+                    status="ERROR",
+                    message=f"selected source type mismatch: {source.path}",
+                )
+            )
+
+    if selected_sources.selected_sources:
+        results.append(CommandValidationResult(status="OK", message="source selector selected at least one source"))
+    else:
+        results.append(CommandValidationResult(status="ERROR", message="source selector selected no sources"))
+
+    return results
+
+
+# Validate rejected source paths because rejected entries are model output too.
+def _validate_rejected_source_paths(
+    selected_sources: SelectedSources,
+    inventory_by_path: dict[str, ReferenceInventoryItem],
+) -> list[CommandValidationResult]:
+    unknown_rejected_paths = [
+        rejected_source.path
+        for rejected_source in selected_sources.rejected_sources
+        if rejected_source.path not in inventory_by_path
+    ]
+    if unknown_rejected_paths:
+        return [
+            CommandValidationResult(
+                status="ERROR",
+                message=f"rejected source paths are not in local inventory: {', '.join(unknown_rejected_paths)}",
+            )
+        ]
+
+    return [CommandValidationResult(status="OK", message="rejected source paths match local inventory")]
+
+
+# Validate that the current workflow has all categories needed by later stages.
+def _validate_required_source_categories(
+    selected_sources: SelectedSources,
+) -> list[CommandValidationResult]:
+    selected_paths = {source.path for source in selected_sources.selected_sources}
+    required_sources = {
+        "declaration template": "data/L4_sendit/references/zalacznik-E.md",
+        "broad SPK rules": "data/L4_sendit/references/index.md",
+        "disabled route evidence": "data/L4_sendit/references/trasy-wylaczone.png",
+        "wagon capacity": "data/L4_sendit/references/dodatkowe-wagony.md",
+        "WDP meaning": "data/L4_sendit/references/zalacznik-G.md",
+    }
+    missing_categories = [
+        category
+        for category, required_path in required_sources.items()
+        if required_path not in selected_paths
+    ]
+
+    if missing_categories:
+        return [
+            CommandValidationResult(
+                status="ERROR",
+                message=f"source selection misses required categories: {', '.join(missing_categories)}",
+            )
+        ]
+
+    return [CommandValidationResult(status="OK", message="source selection covers required categories")]
+
+
+# Validate list fields that preserve uncertainty instead of guessing.
+def _validate_source_selection_lists(selected_sources: SelectedSources) -> list[CommandValidationResult]:
+    results: list[CommandValidationResult] = []
+
+    if selected_sources.missing_sources:
+        results.append(
+            CommandValidationResult(
+                status="ERROR",
+                message=f"model reported missing source needs: {', '.join(selected_sources.missing_sources)}",
+            )
+        )
+    else:
+        results.append(CommandValidationResult(status="OK", message="model reported no missing source needs"))
+
+    if selected_sources.uncertainty_notes:
+        results.append(
+            CommandValidationResult(
+                status="WARNING",
+                message=f"model reported source selection uncertainty notes: {len(selected_sources.uncertainty_notes)}",
+            )
+        )
+    else:
+        results.append(CommandValidationResult(status="OK", message="model reported no source selection uncertainty"))
+
+    return results
 
 
 # Validate normalized numeric values and confidence range.

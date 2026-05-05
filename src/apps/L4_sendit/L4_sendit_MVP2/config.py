@@ -24,8 +24,11 @@ class AppPaths:
     command_file: Path
     references_dir: Path
     output_dir: Path
+    reference_inventory_output_file: Path
     parsed_command_output_file: Path
     raw_command_parse_output_file: Path
+    selected_sources_output_file: Path
+    raw_source_selection_output_file: Path
     extracted_facts_output_file: Path
     declaration_data_output_file: Path
     declaration_output_file: Path
@@ -58,8 +61,11 @@ def build_app_paths(command_file: Path | None = None) -> AppPaths:
         command_file=selected_command_file,
         references_dir=data_dir / "references",
         output_dir=output_dir,
+        reference_inventory_output_file=output_dir / "reference_inventory.json",
         parsed_command_output_file=output_dir / "parsed_command.json",
         raw_command_parse_output_file=output_dir / "model_command_parse_raw.json",
+        selected_sources_output_file=output_dir / "selected_sources.json",
+        raw_source_selection_output_file=output_dir / "model_source_selection_raw.json",
         extracted_facts_output_file=output_dir / "extracted_facts.json",
         declaration_data_output_file=output_dir / "declaration_data.json",
         declaration_output_file=output_dir / "declaration.txt",

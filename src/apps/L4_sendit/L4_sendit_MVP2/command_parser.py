@@ -118,6 +118,7 @@ def _extract_mock_payload(raw_model_response: dict[str, Any]) -> dict[str, Any]:
 
 # Enforce the explicit Stage 1 model-call limit.
 class _ModelRequestGuard:
+    # Initialize the local model-request counter for one parser step.
     def __init__(self, max_requests: int) -> None:
         self._max_requests = max_requests
         self._used_requests = 0

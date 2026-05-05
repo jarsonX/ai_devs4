@@ -1,4 +1,4 @@
-# Command-line entrypoint for the L4 sendit MVP2 Stage 1 pipeline.
+# Command-line entrypoint for the L4 sendit MVP2 Stage 1-2 pipeline.
 
 import argparse
 from pathlib import Path
@@ -30,11 +30,21 @@ from src.apps.L4_sendit.L4_sendit_MVP2.command_parser import (
     parse_command_with_ai,
 )
 from src.apps.L4_sendit.L4_sendit_MVP2.config import build_app_paths, load_model_config
+from src.apps.L4_sendit.L4_sendit_MVP2.models import ParsedCommand, ReferenceInventoryItem
+from src.apps.L4_sendit.L4_sendit_MVP2.reference_inventory import build_reference_inventory
 from src.apps.L4_sendit.L4_sendit_MVP2.report_builder import build_run_report
-from src.apps.L4_sendit.L4_sendit_MVP2.validator import validate_parsed_command
+from src.apps.L4_sendit.L4_sendit_MVP2.source_selector import (
+    load_mock_source_selection_response,
+    select_sources_from_mock,
+    select_sources_with_ai,
+)
+from src.apps.L4_sendit.L4_sendit_MVP2.validator import (
+    validate_parsed_command,
+    validate_selected_sources,
+)
 
 
-# Run MVP2 Stage 1: AI parse command, then reuse deterministic MVP1 pipeline.
+# Run MVP2 Stage 1-2, then reuse deterministic MVP1-compatible pipeline.
 def main() -> None:
     args = _parse_args()
     paths = build_app_paths(command_file=args.command_file)
@@ -42,6 +52,16 @@ def main() -> None:
     command_text = paths.command_file.read_text(encoding="utf-8")
     parse_result, model_source = _parse_command(args, command_text)
     command_validation_results = validate_parsed_command(parse_result.parsed_command)
+    reference_inventory = build_reference_inventory(paths.repo_root, paths.references_dir)
+    source_selection_result, source_selection_model_source = _select_sources(
+        args=args,
+        parsed_command=parse_result.parsed_command,
+        reference_inventory=reference_inventory,
+    )
+    source_selection_validation_results = validate_selected_sources(
+        source_selection_result.selected_sources,
+        reference_inventory,
+    )
 
     facts = load_static_facts()
     template_text = load_declaration_template(paths.references_dir)
@@ -63,15 +83,15 @@ def main() -> None:
         declaration_data=declaration_data,
         wagon_calculation=wagon_calculation,
         validation_results=validation_results,
+        reference_inventory=reference_inventory,
+        selected_sources=source_selection_result.selected_sources,
+        source_selection_validation_results=source_selection_validation_results,
         loaded_references=[
             "data/L4_sendit/input/command.txt",
-            "data/L4_sendit/references/zalacznik-E.md",
-            "data/L4_sendit/references/index.md",
-            "data/L4_sendit/references/trasy-wylaczone.png",
-            "data/L4_sendit/references/dodatkowe-wagony.md",
-            "data/L4_sendit/references/zalacznik-G.md",
+            *[source.path for source in source_selection_result.selected_sources.selected_sources],
         ],
         model_source=model_source,
+        source_selection_model_source=source_selection_model_source,
     )
 
     hub_response = None
@@ -84,8 +104,17 @@ def main() -> None:
         hub_config = _build_masked_payload_config()
         verification_payload = build_verification_payload(hub_config, declaration_text)
 
+    save_json(
+        paths.reference_inventory_output_file,
+        [inventory_item.model_dump(mode="json") for inventory_item in reference_inventory],
+    )
     save_json(paths.parsed_command_output_file, parse_result.parsed_command.model_dump(mode="json"))
     save_json(paths.raw_command_parse_output_file, parse_result.raw_model_response)
+    save_json(
+        paths.selected_sources_output_file,
+        source_selection_result.selected_sources.model_dump(mode="json"),
+    )
+    save_json(paths.raw_source_selection_output_file, source_selection_result.raw_model_response)
     save_json(paths.extracted_facts_output_file, facts)
     save_json(paths.declaration_data_output_file, declaration_data)
     save_json(paths.verification_payload_output_file, mask_payload_for_storage(verification_payload))
@@ -95,9 +124,9 @@ def main() -> None:
         save_json(paths.hub_response_output_file, hub_response)
 
 
-# Parse command-line arguments for the MVP2 Stage 1 runner.
+# Parse command-line arguments for the MVP2 Stage 1-2 runner.
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Render the L4 sendit MVP2 Stage 1 declaration.")
+    parser = argparse.ArgumentParser(description="Render the L4 sendit MVP2 Stage 1-2 declaration.")
     parser.add_argument(
         "--command-file",
         type=Path,
@@ -109,6 +138,12 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Optional JSON file that replaces the real AI command parser call.",
+    )
+    parser.add_argument(
+        "--mock-source-selection-output-file",
+        type=Path,
+        default=None,
+        help="Optional JSON file that replaces the real AI source selector call.",
     )
     parser.add_argument(
         "--submit",
@@ -128,6 +163,27 @@ def _parse_command(args: argparse.Namespace, command_text: str):
 
     model_config = load_model_config()
     return parse_command_with_ai(command_text, model_config), model_config.command_parse_model
+
+
+# Choose between a real guarded model call and local source-selection mock validation.
+def _select_sources(
+    args: argparse.Namespace,
+    parsed_command: ParsedCommand,
+    reference_inventory: list[ReferenceInventoryItem],
+):
+    if args.mock_source_selection_output_file is not None:
+        raw_json_text = args.mock_source_selection_output_file.read_text(encoding="utf-8")
+        raw_model_response = load_mock_source_selection_response(raw_json_text)
+        return (
+            select_sources_from_mock(raw_model_response, reference_inventory),
+            "mock-source-selection-output-file",
+        )
+
+    model_config = load_model_config()
+    return (
+        select_sources_with_ai(parsed_command, reference_inventory, model_config),
+        model_config.source_selection_model,
+    )
 
 
 # Fail before Hub submission if any deterministic validation check is an error.
