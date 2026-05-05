@@ -14,6 +14,9 @@
 - Teach the reasoning behind the solution, not only the commands or code to type.
 - Prefer senior-level design quality, readable implementation, and existing project conventions.
 - Application code uses a short purpose comment for each class, function, and method.
+- Purpose comments must use regular `#` comment lines, not Python docstrings. Use:
+  `# Comment line 1`
+  `# Comment line 2` when a second line is needed.
 - Be explicit about uncertainty, assumptions, trade-offs, and risks.
 
 ## Secrets Policy
