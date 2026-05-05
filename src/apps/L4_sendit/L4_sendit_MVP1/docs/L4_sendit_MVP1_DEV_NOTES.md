@@ -2,9 +2,9 @@
 
 ## Implementation Notes
 
-MVP1 is intentionally deterministic. The app parses one known command format, uses manually confirmed facts, renders the declaration, saves transparent artifacts, and validates the result locally.
+MVP1 is intentionally deterministic. The app parses one known command format, uses manually confirmed facts, renders the declaration, saves transparent artifacts, validates the result locally, and can submit the final declaration to the Hub when explicitly requested.
 
-The current pipeline does not call OpenAI, OCR, vision models, agents, or external APIs. Hub submission is still outside the current MVP1 implementation.
+The current pipeline does not call OpenAI, OCR, vision models, or agents. The only external call in MVP1 is the guarded Hub submission behind `--submit`.
 
 Hub submission is guarded by the explicit `--submit` flag. Without that flag, the app only writes local artifacts and does not load secret Hub configuration.
 
@@ -53,10 +53,23 @@ data/L4_sendit/output/hub_response.json
 
 This makes the final Hub result inspectable after the command finishes.
 
+## Verification Notes
+
+MVP1 was submitted to the course Hub successfully. The Hub accepted the generated declaration, which confirms the key implementation choices:
+
+- category `A` is valid for the disabled `X-01` route in this task,
+- amount due `0 PP` is valid for the selected category,
+- `WDP: 4` is the correct declaration value for the `2800 kg` shipment,
+- no special notes should be rendered beyond `UWAGI SPECJALNE: brak`.
+
+## Resolved Questions
+
+- WDP uses the physical additional wagon count. This was uncertain during implementation, but Hub verification accepted `WDP: 4`.
+- Route `X-01` is manually confirmed from `trasy-wylaczone.png`. The value was sufficient for MVP1 and accepted by Hub verification.
+
 ## Open Questions
 
-- WDP currently uses the physical additional wagon count. This remains visible as uncertainty until Hub verification or stronger evidence resolves it.
-- Route `X-01` is manually confirmed from `trasy-wylaczone.png`. MVP2 should replace that with vision/OCR or another inspectable extraction step.
+- MVP2 should still replace the manual route confirmation with vision/OCR or another inspectable extraction step.
 
 ## Future Work
 

@@ -48,7 +48,7 @@ MVP1 should be built in four small stages:
 7. Build `declaration_data.json`.
 8. Render `declaration.txt`.
 9. Validate the result locally.
-10. Save `run_report.md` explaining decisions and uncertainty.
+10. Save `run_report.md` explaining decisions and resolved uncertainty.
 11. Submit to the Hub only when explicitly requested with `--submit`.
 
 ## Input Command
@@ -107,11 +107,11 @@ Known derived values for the current command:
 | Field | Value | Reason |
 |---|---|---|
 | Route | `X-01` | Direct disabled route from `Gdańsk` to `Żarnowiec` |
-| Category | likely `A` | Reactor fuel cassettes fit strategic transport, and disabled Żarnowiec routes require category `A` or `B` |
-| Amount due | likely `0 PP` | Category `A` shipments are covered by the System |
+| Category | `A` | Reactor fuel cassettes fit strategic transport, disabled Żarnowiec routes require category `A` or `B`, and Hub verification accepted this choice |
+| Amount due | `0 PP` | Category `A` shipments are covered by the System, and Hub verification accepted this value |
 | Physical additional wagons | `4` | `2800 kg - 1000 kg = 1800 kg`; `ceil(1800 / 500) = 4` |
 
-The main interpretation risk is `WDP`. MVP1 should keep this visible in `declaration_data.json` and `run_report.md`.
+`WDP` was the main interpretation risk during implementation. MVP1 used the physical additional wagon count, `4`, kept that decision visible in `declaration_data.json` and `run_report.md`, and Hub verification confirmed that this approach was correct for the course task.
 
 ## Explain Mode
 
@@ -125,7 +125,7 @@ Recommended report sections:
 | `Loaded References` | Show which local documents were used. |
 | `Derived Facts` | Show route, category, amount, and wagon decisions with evidence. |
 | `Validation` | Show `OK`, `WARNING`, or `ERROR` checks before Hub submission. |
-| `Uncertainty` | Explain the `WDP` ambiguity and chosen value. |
+| `Uncertainty` | Preserve the historical `WDP` ambiguity and show that Hub verification resolved it. |
 | `Closed Route Reasoning` | Explain that route `X-01` is disabled and therefore category `A` is intentional. |
 
 Example validation lines:
@@ -136,7 +136,7 @@ OK: route code found
 OK: closed route status handled by category A
 OK: declaration template loaded
 OK: no special notes rendered
-WARNING: WDP interpretation is uncertain
+WARNING: WDP interpretation was uncertain before Hub verification
 ```
 
 ## Configuration
@@ -163,24 +163,23 @@ All runtime files should live under the repository-level `.\data\L4_sendit` dire
 | `.\data\L4_sendit\references\*` | Local SPK attachments and supporting reference files |
 | `.\data\L4_sendit\output\parsed_command.json` | Parsed command data |
 | `.\data\L4_sendit\output\extracted_facts.json` | Known facts used by MVP1 |
-| `.\data\L4_sendit\output\declaration_data.json` | Structured declaration model with evidence and uncertainty |
+| `.\data\L4_sendit\output\declaration_data.json` | Structured declaration model with evidence and resolved uncertainty notes |
 | `.\data\L4_sendit\output\declaration.txt` | Final declaration string |
 | `.\data\L4_sendit\output\verification_payload.json` | Hub payload without exposing secrets |
+| `.\data\L4_sendit\output\hub_response.json` | Hub response saved after explicit `--submit` |
 | `.\data\L4_sendit\output\run_report.md` | Human-readable explanation of the run |
 
 No generated artifact should be written under `.\src\apps\L4_sendit`.
 
 ## Run
 
-No runnable implementation exists yet.
-
-Planned command:
+Run locally without Hub submission:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP1.main --command-file .\data\L4_sendit\input\command.txt
 ```
 
-Planned optional submission:
+Submit to the Hub explicitly:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP1.main --command-file .\data\L4_sendit\input\command.txt --submit
@@ -207,7 +206,8 @@ Current files:
 | Path | Responsibility |
 |---|---|
 | `docs/L4_exercise.md` | Original course brief used only as developer learning context |
-| `docs/L4_sendit_MVP1_README.md` | MVP1 learning design and implementation notes |
+| `docs/L4_sendit_MVP1_README.md` | MVP1 current behavior and implementation notes |
+| `docs/L4_sendit_MVP1_DEV_NOTES.md` | Development history, AI boundary notes, and resolved uncertainty |
 
 ## Verification
 
@@ -222,6 +222,6 @@ Local verification should run before any Hub submission:
 7. Confirm that additional wagon calculation is sufficient for `2800 kg`.
 8. Confirm that no special notes are rendered.
 9. Confirm that final declaration field order and separators match the template.
-10. Confirm that `run_report.md` explains decisions, closed-route reasoning, and uncertainty.
+10. Confirm that `run_report.md` explains decisions, closed-route reasoning, and the resolved `WDP` uncertainty.
 
-Hub verification should be explicit and guarded by `--submit`.
+Hub verification should be explicit and guarded by `--submit`. MVP1 has been submitted successfully; the Hub accepted the generated declaration.
