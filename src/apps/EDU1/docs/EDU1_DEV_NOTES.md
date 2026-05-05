@@ -3,6 +3,13 @@
 This file stores implementation-oriented notes for EDU1.
 It is separate from `EDU1_README.md`, which should stay focused on the app itself.
 
+## Table Of Contents
+
+- [Implementation Summary](#implementation-summary)
+- [Recommended Implementation Order](#recommended-implementation-order)
+- [Verification Suggestions](#verification-suggestions)
+- [Design Guardrails](#design-guardrails)
+
 ## Implementation Summary
 
 - The project started from the planned staged-agent design described in `EDU1_README.md`.

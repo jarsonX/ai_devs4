@@ -1,5 +1,16 @@
 # L4 Sendit MVP1 Dev Notes
 
+## Table Of Contents
+
+- [Implementation Notes](#implementation-notes)
+- [AI Boundary](#ai-boundary)
+- [Design Decisions](#design-decisions)
+- [Hub Submission Notes](#hub-submission-notes)
+- [Verification Notes](#verification-notes)
+- [Resolved Questions](#resolved-questions)
+- [Open Questions](#open-questions)
+- [Future Work](#future-work)
+
 ## Implementation Notes
 
 MVP1 is intentionally deterministic. The app parses one known command format, uses manually confirmed facts, renders the declaration, saves transparent artifacts, validates the result locally, and can submit the final declaration to the Hub when explicitly requested.

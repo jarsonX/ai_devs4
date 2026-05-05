@@ -4,6 +4,13 @@
 
 This app solves the AI_devs `findhim` task using an agent with OpenAI Function Calling.
 
+## Table Of Contents
+
+- [L2 FindHim](#l2-findhim)
+  - [What it does](#what-it-does)
+  - [Main modules](#main-modules)
+  - [Notes](#notes)
+
 ### What it does
 
 1. Loads suspects from the result of task `L1_people`.

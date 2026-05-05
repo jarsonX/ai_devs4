@@ -2,6 +2,23 @@
 
 Generated at: 2026-04-29 17:09:56 +02:00
 
+## Table Of Contents
+
+- [Scope](#scope)
+- [Commands](#commands)
+- [Verified Areas](#verified-areas)
+  - [Configuration](#configuration)
+  - [Session Store](#session-store)
+  - [Packages API Client](#packages-api-client)
+  - [Tool Dispatch](#tool-dispatch)
+  - [Reactor Context Detection](#reactor-context-detection)
+  - [Agent Loop](#agent-loop)
+  - [Pipeline](#pipeline)
+  - [HTTP Handler](#http-handler)
+  - [Technical Logging](#technical-logging)
+- [Explicitly Not Tested](#explicitly-not-tested)
+- [Current Assessment](#current-assessment)
+
 ## Scope
 
 This report covers local MVP verification for `src/apps/L3_proxy`.

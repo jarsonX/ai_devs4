@@ -2,6 +2,17 @@
 
 Generated at: 2026-04-29T15:27:24.238720+00:00
 
+## Table Of Contents
+
+- [Scope](#scope)
+- [Guard](#guard)
+- [Configuration](#configuration)
+- [Result](#result)
+- [Assistant Message](#assistant-message)
+- [Fake Packages API Calls](#fake-packages-api-calls)
+- [OpenAI Request Summary](#openai-request-summary)
+- [Notes](#notes)
+
 ## Scope
 
 This verification used the real OpenAI API and a fake packages API.

@@ -4,6 +4,14 @@
 
 L1 People solves the AI_devs `people` task. The app downloads people data from the course API, narrows the dataset with deterministic filters, asks OpenAI to classify jobs for the remaining candidates, and sends the final answer to the verification endpoint.
 
+## Table Of Contents
+
+- [Purpose](#purpose)
+- [Workflow](#workflow)
+- [Main Modules](#main-modules)
+- [Required Configuration](#required-configuration)
+- [Run](#run)
+
 ## Purpose
 
 The app demonstrates a hybrid workflow:

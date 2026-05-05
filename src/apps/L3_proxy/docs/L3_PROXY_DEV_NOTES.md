@@ -1,5 +1,13 @@
 # L3_proxy Development Notes
 
+## Table Of Contents
+
+- [Implementation Plan](#implementation-plan)
+- [Runtime Defaults](#runtime-defaults)
+- [Design Guardrails](#design-guardrails)
+- [Verification Checklist](#verification-checklist)
+- [Final Outcome](#final-outcome)
+
 ## Implementation Plan
 
 This section is the source of truth for implementation work on `L3_proxy`.

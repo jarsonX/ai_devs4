@@ -3,6 +3,44 @@
 EDU1 is an educational app inspired by `L2_findhim`.
 Its goal is to explain the core idea of an agent-style application without the full complexity of the reference app.
 
+## Table Of Contents
+
+- [Purpose](#purpose)
+- [Current Business Goal](#current-business-goal)
+- [Role Of OpenAI](#role-of-openai)
+- [Expected Output](#expected-output)
+- [Workflow Stages](#workflow-stages)
+  - [1. Setup](#1-setup)
+  - [2. Selection](#2-selection)
+  - [3. Finalize](#3-finalize)
+- [Responsibility Split](#responsibility-split)
+- [Planned Tools](#planned-tools)
+  - [Setup Tools](#setup-tools)
+  - [Selection Tools](#selection-tools)
+  - [Finalize Tools](#finalize-tools)
+- [Tool Exposure Strategy](#tool-exposure-strategy)
+- [Planned Agent State](#planned-agent-state)
+- [Stage Completion Rules](#stage-completion-rules)
+- [Selected City Validation Rule](#selected-city-validation-rule)
+- [Planned Stage Flow](#planned-stage-flow)
+- [Planned File Structure](#planned-file-structure)
+- [File Responsibilities](#file-responsibilities)
+- [Boundary Rules](#boundary-rules)
+- [Planned Internal Contents](#planned-internal-contents)
+- [Planned Functions And Contracts](#planned-functions-and-contracts)
+  - [`models.py`](#modelspy)
+  - [`config.py`](#configpy)
+  - [`data_loader.py`](#dataloaderpy)
+  - [`api_client.py`](#apiclientpy)
+  - [`tools.py`](#toolspy)
+  - [`agent.py`](#agentpy)
+  - [`pipeline.py`](#pipelinepy)
+  - [`main.py`](#mainpy)
+- [Validation And Error Rules](#validation-and-error-rules)
+- [Serialization Rule](#serialization-rule)
+- [Assumptions](#assumptions)
+- [Status](#status)
+
 ## Purpose
 
 The app is meant for learning:

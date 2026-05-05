@@ -1,5 +1,23 @@
 # L4 Sendit MVP1
 
+## Table Of Contents
+
+- [Purpose](#purpose)
+- [Learning Rationale](#learning-rationale)
+- [Closed Route Rule](#closed-route-rule)
+- [Learning Stages](#learning-stages)
+- [Workflow](#workflow)
+- [Input Command](#input-command)
+- [What MVP1 Is Not](#what-mvp1-is-not)
+- [Declaration Language](#declaration-language)
+- [Current Facts](#current-facts)
+- [Explain Mode](#explain-mode)
+- [Configuration](#configuration)
+- [Data Locations](#data-locations)
+- [Run](#run)
+- [Main Modules](#main-modules)
+- [Verification](#verification)
+
 ## Purpose
 
 `L4_sendit_MVP1` is a learning version of the SPK declaration app. It is intentionally simple, explicit, and deterministic.

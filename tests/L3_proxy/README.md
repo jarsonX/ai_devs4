@@ -2,6 +2,11 @@
 
 This directory groups L3_proxy verification by scenario.
 
+## Table Of Contents
+
+- [local_mvp](#localmvp)
+- [openai_agent](#openaiagent)
+
 ## local_mvp
 
 `local_mvp/test_local_mvp.py` runs repeatable local tests without real external services.

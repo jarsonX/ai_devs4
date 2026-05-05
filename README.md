@@ -4,6 +4,16 @@ Python-based solutions and experiments developed during the AI_devs AI engineeri
 
 This repository is both a learning workspace and a portfolio of applied AI engineering practice. Its goal is not only to pass course assignments, but also to explore how AI-powered applications can be designed, implemented, documented, reviewed, and operated in a way that is closer to production software than to one-off scripts.
 
+## Table Of Contents
+
+- [About the course](#about-the-course)
+- [Repository structure](#repository-structure)
+- [Learning approach](#learning-approach)
+- [What this repository demonstrates](#what-this-repository-demonstrates)
+- [Disclaimers](#disclaimers)
+  - [Course & Content](#course-content)
+  - [AI Usage](#ai-usage)
+
 ## About the course
 
 AI_devs is a hands-on course focused on building real-world applications with Large Language Models and AI APIs.
