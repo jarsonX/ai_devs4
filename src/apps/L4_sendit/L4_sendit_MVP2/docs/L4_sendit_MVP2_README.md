@@ -36,11 +36,22 @@ The learning goal is to show how an AI-assisted application can separate task un
 
 The workflow is designed as a general command-driven application shape, but the currently planned executable task is `spk_transport_declaration`. Supporting additional command types requires explicit executor implementations for those tasks.
 
+The design intentionally does not define a fixed file list for every task. A different design could map each task to a static set of required documents, but this MVP2 assumes a business requirement for dynamic document selection. The app should know what information must be found for a task, while remaining ready for documentation changes where the same information may appear in different attachments over time.
+
 ## Design Status
 
 This README describes the intended MVP2 design. In this repository, `MVP2` means the AI-assisted command-driven version of `L4_sendit`. The design must not assume that every command needs WDP, wagon capacity, disabled-route evidence, or a declaration template. Those needs may appear only after the command has been understood and the current task has been identified.
 
 The current design passed `_agent/instructions/llm_design_checklist.md` review on 2026-05-06 for the full MVP2 workflow.
+
+Current implementation status:
+
+- Stage 1 `Command Understanding` is implemented.
+- Stage 2 `Reference Inventory` is implemented.
+- Stage 3 `Source Selection` is implemented.
+- Stage 4 `Evidence Extraction` is implemented.
+- Stage 5 `Task Execution` is implemented for the currently supported known task.
+- Later stages remain design-only.
 
 ## Runtime Goal
 
@@ -247,6 +258,8 @@ Which local reference files are needed to complete this identified task, and why
 | `data/L4_sendit/output/reference_inventory.json` | Stage 2 | Validated local file inventory |
 
 The model should receive the task understanding and compact inventory only. It should not receive full contents of every reference file.
+
+This is a deliberate design choice. The app could be built with a deterministic task-to-files map, but MVP2 assumes that the documentation set may evolve. Stage 3 therefore reasons dynamically over the current inventory: it knows which documentation needs must be covered for the task, but it does not assume in advance which attachment names will satisfy those needs.
 
 ### Output Schema
 
@@ -721,18 +734,30 @@ No generated artifact should be written under `src/apps/L4_sendit`.
 
 ## Run
 
-The approved design is not fully implemented yet. The commands below describe the planned runtime interface for the MVP2 workflow.
+The approved design is partially implemented. The current runnable interface covers Stage 1 through Stage 5.
 
-Planned run with real guarded model calls:
+Run with real guarded model calls:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt
 ```
 
-Planned optional submission:
+Run with a mock Stage 1 response:
 
 ```powershell
-.\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --submit
+.\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --mock-model-output-file .\data\L4_sendit\output\stage1_mock_task_understanding.json
+```
+
+Run with a mock Stage 3 response:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --mock-source-selection-output-file .\data\L4_sendit\output\stage3_mock_selected_sources.json
+```
+
+Run with a mock Stage 4 response:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --mock-evidence-output-file .\data\L4_sendit\output\stage4_mock_evidence_package.json
 ```
 
 ## Main Modules
@@ -755,13 +780,14 @@ Planned module responsibilities:
 
 ## Verification
 
-After implementation, the simplest verification should be:
+With the current implementation, the simplest verification is:
 
 1. Run the app against `data/L4_sendit/input/command.txt` without `--submit`.
 2. Confirm `task_understanding.json` identifies the requested task.
 3. Confirm `selected_sources.json` contains only local inventory paths and no fixed global requirements.
-4. Confirm `evidence_package.json` contains evidence only from selected sources.
-5. Confirm `task_result.json` validates before rendering for supported tasks.
-6. Confirm unsupported `task_name` values fail before task execution with a clear executor-related error.
-7. Confirm `run_report.md` explains task identity, selected sources, evidence, uncertainty, and validation results.
-8. Confirm no external submission happens without `--submit`.
+4. Confirm `evidence_package.json` contains facts only from selected sources and preserves missing facts instead of guessing.
+5. Confirm `task_result.json` is produced only by the registered executor for the supported task and keeps interpretation risk in `uncertainty_notes`.
+6. Confirm `run_report.md` explains task identity, selected sources, extracted evidence, task result, uncertainty, and validation results.
+7. Confirm unsupported `task_name` values fail before downstream execution with a clear task-registry error.
+
+For later stages, keep the design sections in this README as the source of truth until implementation is added.
