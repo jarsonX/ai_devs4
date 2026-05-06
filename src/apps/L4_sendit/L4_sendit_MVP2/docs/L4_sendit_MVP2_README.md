@@ -3,25 +3,23 @@
 ## Table Of Contents
 
 - [Purpose](#purpose)
+- [Design Status](#design-status)
+- [Runtime Goal](#runtime-goal)
 - [Workflow](#workflow)
-- [Input Command](#input-command)
-- [MVP2 Scope](#mvp2-scope)
-- [Implementation Plan](#implementation-plan)
-  - [Stage 1: AI Command Parser](#stage-1-ai-command-parser)
-  - [Stage 2: Source Selection](#stage-2-source-selection)
-  - [Stage 3: Text Fact Extraction](#stage-3-text-fact-extraction)
+- [Stage Overview](#stage-overview)
+- [Stage 1: Command Understanding](#stage-1-command-understanding)
+- [Stage 2: Reference Inventory](#stage-2-reference-inventory)
+- [Stage 3: Source Selection](#stage-3-source-selection)
+- [Stage 4: Evidence Extraction](#stage-4-evidence-extraction)
+- [Stage 5: Task Execution](#stage-5-task-execution)
+- [Stage 6: Validation And Rendering](#stage-6-validation-and-rendering)
+- [Stage 7: Reporting And Optional Submission](#stage-7-reporting-and-optional-submission)
 - [Model Selection Plan](#model-selection-plan)
 - [Prompt Plan](#prompt-plan)
 - [Structured Output Schemas](#structured-output-schemas)
-  - [Command Schema](#command-schema)
-  - [Selected Sources Schema](#selected-sources-schema)
-  - [Extracted Facts Schema](#extracted-facts-schema)
-  - [Declaration Data Schema](#declaration-data-schema)
 - [Context And Tool Plan](#context-and-tool-plan)
 - [Batching And Caching Plan](#batching-and-caching-plan)
 - [LLM Design Reviews](#llm-design-reviews)
-- [Declaration Language](#declaration-language)
-- [AI Role](#ai-role)
 - [Configuration](#configuration)
 - [Data Locations](#data-locations)
 - [Run](#run)
@@ -30,219 +28,244 @@
 
 ## Purpose
 
-`L4_sendit_MVP2` extends the MVP1 pipeline with AI-assisted command parsing, source selection, multimodal extraction, and uncertainty reporting.
+`L4_sendit_MVP2` is a command-driven SPK documentation workflow.
 
-The goal is to show where AI adds value without replacing deterministic validation, formatting, persistence, and optional Hub submission.
+The application should read the operational command from `data/L4_sendit/input/command.txt`, determine what task must be completed, select the local documentation needed for that task from `data/L4_sendit/references`, extract evidence, execute the task, and produce validated output artifacts.
+
+The learning goal is to show how an AI-assisted application can separate task understanding, source selection, evidence extraction, reasoning, validation, rendering, and optional external submission. AI may help with language-heavy, ambiguous, or multimodal work. Deterministic code owns file access, path validation, schemas, stable calculations, output writing, and submission guards.
+
+The workflow is designed as a general command-driven application shape, but the currently planned executable task is `spk_transport_declaration`. Supporting additional command types requires explicit executor implementations for those tasks.
+
+## Design Status
+
+This README describes the intended MVP2 design. In this repository, `MVP2` means the AI-assisted command-driven version of `L4_sendit`. The design must not assume that every command needs WDP, wagon capacity, disabled-route evidence, or a declaration template. Those needs may appear only after the command has been understood and the current task has been identified.
+
+The current design passed `_agent/instructions/llm_design_checklist.md` review on 2026-05-06 for the full MVP2 workflow.
+
+## Runtime Goal
+
+The application should support this general runtime contract:
+
+1. Read `data/L4_sendit/input/command.txt`.
+2. Identify the task requested by the command.
+3. Build a deterministic inventory of local reference files from `data/L4_sendit/references`.
+4. Select documentation relevant to the identified task.
+5. Extract task-relevant evidence from selected text and media sources.
+6. Execute the requested task using validated command data and validated evidence.
+7. Validate the result before rendering or submission.
+8. Save inspectable artifacts under `data/L4_sendit/output`.
+9. Submit externally only when explicitly requested.
+
+The current implementation scope is narrower than the general contract: MVP2 is planned to understand and route commands in a general way, but it should execute only task types that have an explicit registered executor.
 
 ## Workflow
 
-1. Load a concise command from `.\data\L4_sendit\input\command.txt`.
-2. Use AI or a fallback parser to convert the command into structured shipment data.
-3. Load local SPK references from `.\data\L4_sendit\references`.
-4. Use AI-assisted source selection to identify relevant markdown and image references.
-5. Extract the declaration template from `zalacznik-E.md`.
-6. Extract route, payment, category, wagon, and abbreviation facts from selected documents.
-7. Use a vision-capable model or OCR for image references such as `trasy-wylaczone.png`.
-8. Build a structured declaration model with evidence and uncertainty.
-9. Validate the model locally with deterministic checks.
-10. Render the exact declaration text required by the Hub.
-11. Save intermediate artifacts, final output, and a run report.
-12. Submit to the Hub only when explicitly requested.
+1. Load the command text from `data/L4_sendit/input/command.txt`.
+2. Use AI to convert the command into a validated `TaskUnderstanding` object.
+3. Build a deterministic inventory of available local SPK references.
+4. Use AI to select sources for the identified task from the inventory only.
+5. Validate selected source paths, types, and missing-source notes.
+6. Extract evidence from selected sources according to the task and source modality.
+7. Validate extracted evidence before downstream use.
+8. Execute the identified task with a task-specific executor.
+9. Validate the task result against the task contract.
+10. Render final output files.
+11. Write a run report with decisions, evidence, uncertainty, and validation results.
+12. Submit to the Hub only when the command-line user passes `--submit`.
 
-## Input Command
-
-The runtime command file lives in `.\data\L4_sendit\input\command.txt`. The `data` directory is intentionally ignored by Git, so the canonical command content is documented here for GitHub readers.
-
-```text
-Prepare a SPK transport declaration for task sendit.
-
-Shipment data:
-- sender identifier: 450202122
-- origin point: Gdańsk
-- destination point: Żarnowiec
-- weight: 2800 kg
-- budget: 0 PP
-- contents: kasety z paliwem do reaktora
-- special notes: none
-
-Use the local SPK documentation from .\data\L4_sendit\references.
-Return the complete declaration text formatted exactly like the declaration template from the documentation.
-```
-
-## MVP2 Scope
-
-| Area | MVP2 behavior |
-|---|---|
-| AI usage | Bounded and inspectable |
-| Command parsing | AI-assisted natural-language extraction with structured output |
-| Image handling | Vision or OCR extraction from `trasy-wylaczone.png` |
-| Fact extraction | AI-assisted extraction from selected references |
-| Reasoning | AI may propose interpretations; code keeps evidence and uncertainty |
-| Validation | Deterministic checks remain mandatory |
-| Output | Files saved under `.\data\L4_sendit\output` |
-
-## Implementation Plan
-
-MVP2 should be implemented as small stages. Each stage must keep the working MVP1 behavior intact and add one AI-assisted capability behind a clear boundary.
+## Stage Overview
 
 | Stage | Goal | AI role | Deterministic owner | Output |
 |---|---|---|---|---|
-| 1. AI Command Parser | Convert the operational command into validated structured shipment data. | Extract fields from natural language into a schema. | Validate schema, required fields, types, and semantic basics. | `parsed_command.json`, command parsing section in `run_report.md` |
-| 2. Source Selection | Select relevant SPK reference files for the current command. | Rank or choose likely relevant text/image sources. | Load files, check paths, reject unknown or missing references. | `selected_sources.json`, loaded references section |
-| 3. Text Fact Extraction | Extract route, payment, category, wagon, and abbreviation facts from markdown files. | Extract candidate facts with evidence snippets and uncertainty. | Validate required facts and evidence references. | `extracted_facts.json` |
-| 4. Image Fact Extraction | Extract disabled-route information from `trasy-wylaczone.png`. | Read image/table content with vision or OCR. | Validate extracted route against expected route/category logic. | image evidence in `extracted_facts.json` |
-| 5. Reasoned Declaration Model | Combine command data and extracted facts into declaration data. | Propose interpretations and uncertainty notes. | Calculate wagons, validate decisions, render declaration. | `declaration_data.json`, `declaration.txt` |
-| 6. Hub Submission | Reuse guarded MVP1 submission behavior. | None. | Mask payload, submit only with `--submit`, save Hub response. | `verification_payload.json`, `hub_response.json` |
+| 1. Command Understanding | Determine what task the command requests and extract supplied inputs. | Classify task intent and extract command data into a schema. | Load command, validate schema, reject missing required task identity. | `task_understanding.json` |
+| 2. Reference Inventory | Describe available local documentation. | None. | Discover files, detect type, size, path, and safe hints. | `reference_inventory.json` |
+| 3. Source Selection | Choose sources needed for the identified task. | Select relevant files from inventory and explain documentation needs. | Validate paths, types, inventory membership, and missing-source handling. | `selected_sources.json` |
+| 4. Evidence Extraction | Extract task-relevant facts from selected sources. | Extract text facts and media facts with evidence and uncertainty. | Load only selected files, validate evidence, preserve missing facts. | `evidence_package.json` |
+| 5. Task Execution | Produce a task-specific structured result. | Propose interpretations only where rules are ambiguous. | Route to executor, perform stable calculations, keep unsupported claims out. | `task_result.json` |
+| 6. Validation And Rendering | Validate and render the final deliverable. | None by default. | Validate result contract, render final text or payload. | `final_output.*` |
+| 7. Reporting And Optional Submission | Save audit artifacts and optionally submit. | Summarize uncertainty only if needed. | Write report, mask secrets, submit only with `--submit`. | `run_report.md`, optional Hub artifacts |
 
-### Stage 1: AI Command Parser
+## Stage 1: Command Understanding
 
-Stage 1 is the first implementation step. It replaces the fixed-format MVP1 command parser with an AI-assisted parser, but nothing else in the pipeline should become AI-driven yet.
+Stage 1 reads the command and identifies the task before any documentation is selected.
 
-The reason for starting here is educational: command parsing is language-heavy, low-risk when validated, and easy to compare against the known MVP1 output.
+The reason for this stage is architectural: source selection cannot be correct until the app knows what job the command asks it to perform.
 
-#### Stage 1 Goal
+### Goal
 
-Read `data/L4_sendit/input/command.txt` and produce structured shipment data that can be consumed by the existing deterministic pipeline.
+Produce a structured task description that downstream stages can use without rereading the raw command.
 
-The parser must extract:
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `sender_identifier` | string | yes | Expected current value: `450202122` |
-| `origin_point` | string | yes | Preserve Polish characters, for example `Gdańsk` |
-| `destination_point` | string | yes | Preserve Polish characters, for example `Żarnowiec` |
-| `weight_kg` | integer | yes | Normalize `2.8 tony` or `2800 kg` to kilograms |
-| `budget_pp` | integer | yes | Normalize `0 PP` to `0` |
-| `contents` | string | yes | Preserve Polish wording |
-| `special_notes` | string | yes | Normalize no notes to `none` |
-| `confidence` | number | yes | Range `0.0` to `1.0` |
-| `missing_fields` | list[string] | yes | Empty when all required fields are present |
-| `uncertainty_notes` | list[string] | yes | Empty when no parsing uncertainty remains |
-
-#### Stage 1 Boundaries
-
-Stage 1 may use AI only for command parsing.
-
-Stage 1 must not:
-
-- select SPK reference files dynamically,
-- extract facts from `index.md` or attachments,
-- use vision/OCR,
-- change route/category/payment reasoning,
-- change declaration rendering,
-- submit to the Hub automatically.
-
-MVP1 deterministic logic remains responsible for static facts, wagon calculation, local validation, declaration rendering, artifact writing, and guarded Hub submission.
-
-#### Stage 1 Guardrails
-
-Every real model run must have an explicit small guard:
+Stage 1 should answer:
 
 ```text
-DEFAULT_MAX_MODEL_REQUESTS = 1
+What task is requested, what output is expected, and what input data did the command provide?
 ```
 
-The guard lives in `config.py` because it is an application safety setting, not a secret. If the limit is reached, the app should fail with a clear guard-related error instead of retrying indefinitely.
-
-Model output must be treated as untrusted until deterministic validation confirms:
-
-- required fields are present,
-- field types are correct,
-- `weight_kg` and `budget_pp` are normalized integers,
-- `confidence` is within `0.0` to `1.0`,
-- `missing_fields` and `uncertainty_notes` are lists,
-- Polish values are preserved.
-
-This follows the schema-first validation approach from `_agent/references/L1_structured_outputs_and_validation.md`.
-
-#### Stage 1 Artifacts
-
-Stage 1 should save:
-
-| Path | Purpose |
-|---|---|
-| `data/L4_sendit/output/parsed_command.json` | Validated structured command used by the pipeline |
-| `data/L4_sendit/output/model_command_parse_raw.json` | Raw model response for inspection, without secrets |
-| `data/L4_sendit/output/run_report.md` | Parsing summary, validation results, and uncertainty notes |
-
-#### Stage 1 Acceptance Criteria
-
-Stage 1 is complete when:
-
-1. The app can parse the current command with AI into the same core shipment values MVP1 used.
-2. Invalid or incomplete model output fails before downstream use.
-3. `parsed_command.json` contains the validated schema fields listed above.
-4. `run_report.md` explains whether AI parsing had missing fields or uncertainty.
-5. The final declaration remains equivalent to the Hub-accepted MVP1 declaration.
-6. No model call can exceed the configured request limit.
-
-### Stage 2: Source Selection
-
-Stage 2 is the second implementation step. It adds AI-assisted selection of local SPK reference files, but it must not extract facts or reason about the final declaration yet.
-
-The reason for this stage is educational: a model can help reduce a broad local reference set to a small task-relevant context package, while deterministic code keeps file access, path validation, and downstream boundaries safe.
-
-This design follows `_agent/references/L2_context_routing_and_tool_exposure.md`, `_agent/references/L2_query_transformation_context_and_optimization.md`, and `_agent/references/L1_structured_outputs_and_validation.md`.
-
-#### Stage 2 Goal
-
-Use the validated Stage 1 command and a deterministic inventory of `data/L4_sendit/references` to produce a validated source selection plan for later extraction stages.
-
-Stage 2 should answer this narrow question:
-
-```text
-Which local SPK reference files should later extraction stages inspect for this shipment?
-```
-
-Stage 2 output is a source-selection artifact, not extracted facts.
-
-#### Stage 2 Inputs
+### Inputs
 
 | Input | Owner | Notes |
 |---|---|---|
-| `data/L4_sendit/output/parsed_command.json` | Stage 1 | Must already pass command validation |
-| `data/L4_sendit/references` file inventory | deterministic code | Include path, source type, size, and a short deterministic description when available |
-| Optional reference hints | deterministic code | Filename-derived hints such as `zalacznik-E`, `trasy-wylaczone`, or `dodatkowe-wagony`; not full file contents |
+| `data/L4_sendit/input/command.txt` | deterministic code | Raw operational command |
 
-The model should not receive full contents of every reference file. It should receive a compact inventory because Stage 2 is selecting sources, not reading or extracting them.
+### Output Schema
 
-#### Stage 2 Candidate Inventory
+```json
+{
+  "task_name": "spk_transport_declaration",
+  "task_goal": "Prepare a validated SPK transport declaration.",
+  "expected_output_kind": "declaration_text",
+  "domain": "spk_transport",
+  "provided_inputs": {
+    "sender_identifier": "450202122",
+    "origin_point": "Gdańsk",
+    "destination_point": "Żarnowiec",
+    "weight_kg": 2800,
+    "budget_pp": 0,
+    "contents": "kasety z paliwem do reaktora",
+    "special_notes": "none"
+  },
+  "documentation_needs": [
+    {
+      "need": "declaration format",
+      "reason": "The command asks for a declaration text."
+    }
+  ],
+  "success_criteria": [
+    "The result must match the requested declaration format."
+  ],
+  "missing_inputs": [],
+  "uncertainty_notes": [],
+  "confidence": 0.0
+}
+```
 
-The deterministic inventory should include the current local reference files:
+The example above documents one possible command. It is not a fixed requirement for every command.
 
-| Path | Source type | Inventory hint |
+### Boundaries
+
+Stage 1 may use AI only for command understanding.
+
+Stage 1 must not:
+
+- choose documentation files,
+- extract facts from documentation,
+- infer hidden SPK rules,
+- calculate route, payment, wagon count, WDP, or other task results,
+- render or submit the final output.
+
+### Validation
+
+Deterministic validation must confirm:
+
+- `task_name`, `task_goal`, `expected_output_kind`, and `domain` are present,
+- `provided_inputs` is an object,
+- `documentation_needs`, `success_criteria`, `missing_inputs`, and `uncertainty_notes` are lists,
+- `confidence` is within `0.0` to `1.0`,
+- missing required information is reported instead of guessed.
+
+If `task_name` or expected output cannot be identified, the app must stop before source selection.
+
+### Artifacts
+
+| Path | Purpose |
+|---|---|
+| `data/L4_sendit/output/task_understanding.json` | Validated task description |
+| `data/L4_sendit/output/model_task_understanding_raw.json` | Raw model response without secrets |
+
+## Stage 2: Reference Inventory
+
+Stage 2 builds a deterministic inventory of local reference files. This stage has no model call.
+
+The reason for this stage is safety: source selection should operate on a known list of local files, not on model-invented paths.
+
+### Goal
+
+Produce a compact inventory that allows Stage 3 to choose files without reading every document in full.
+
+### Inputs
+
+| Input | Owner | Notes |
 |---|---|---|
-| `data/L4_sendit/references/index.md` | markdown | main SPK documentation index and broad rules |
-| `data/L4_sendit/references/zalacznik-C.md` | markdown | attachment C |
-| `data/L4_sendit/references/zalacznik-D.md` | markdown | attachment D |
-| `data/L4_sendit/references/zalacznik-E.md` | markdown | declaration template |
-| `data/L4_sendit/references/zalacznik-F.md` | markdown | attachment F |
-| `data/L4_sendit/references/zalacznik-G.md` | markdown | attachment G |
-| `data/L4_sendit/references/zalacznik-H.md` | markdown | attachment H |
-| `data/L4_sendit/references/dodatkowe-wagony.md` | markdown | additional wagon information |
-| `data/L4_sendit/references/trasy-wylaczone.png` | image | disabled routes image/table |
+| `data/L4_sendit/references` | deterministic code | Local documentation directory |
 
-Code must discover the actual files at runtime and reject model-selected paths that are not present in the current inventory. The table above documents the expected current learning dataset, not a permission to trust hard-coded model paths.
+### Output Schema
 
-#### Stage 2 Output Schema
+```json
+{
+  "references": [
+    {
+      "path": "data/L4_sendit/references/index.md",
+      "source_type": "markdown",
+      "size_bytes": 44928,
+      "hint": "main SPK documentation index and broad rules"
+    }
+  ]
+}
+```
 
-Stage 2 should produce:
+Hints may describe filenames, attachment labels, source types, and short safe summaries. Hints must not hard-code task-specific requirements such as "must use this for WDP" unless the file itself clearly has that general purpose.
+
+### Validation
+
+Deterministic validation must confirm:
+
+- references directory exists,
+- every inventory path is repository-root-relative,
+- every path stays under `data/L4_sendit/references`,
+- source type is one of `markdown`, `image`, or `other`,
+- inventory is non-empty.
+
+### Artifacts
+
+| Path | Purpose |
+|---|---|
+| `data/L4_sendit/output/reference_inventory.json` | Validated local source inventory |
+
+## Stage 3: Source Selection
+
+Stage 3 selects sources for the task identified in Stage 1.
+
+The reason for this stage is contextual: the app should reduce a broad local reference set to a task-relevant package without assuming that all tasks need the same documents.
+
+This design follows `_agent/references/L2_context_routing_and_tool_exposure.md`: expose only the knowledge resources needed for the current request.
+
+### Goal
+
+Use `task_understanding.json` and `reference_inventory.json` to choose local reference files for later extraction.
+
+Stage 3 should answer:
+
+```text
+Which local reference files are needed to complete this identified task, and why?
+```
+
+### Inputs
+
+| Input | Owner | Notes |
+|---|---|---|
+| `data/L4_sendit/output/task_understanding.json` | Stage 1 | Validated task identity and command data |
+| `data/L4_sendit/output/reference_inventory.json` | Stage 2 | Validated local file inventory |
+
+The model should receive the task understanding and compact inventory only. It should not receive full contents of every reference file.
+
+### Output Schema
 
 ```json
 {
   "selected_sources": [
     {
-      "path": "data/L4_sendit/references/index.md",
+      "path": "data/L4_sendit/references/zalacznik-E.md",
       "source_type": "markdown",
-      "reason": "Contains broad SPK rules likely needed for route, category, and payment interpretation.",
-      "intended_use": "text_fact_extraction",
+      "documentation_need": "declaration format",
+      "reason": "The task asks for a declaration text and this file appears to contain the template.",
+      "intended_use": "format_reference",
       "confidence": 0.0
     }
   ],
   "rejected_sources": [
     {
       "path": "data/L4_sendit/references/zalacznik-C.md",
-      "reason": "Not relevant to this shipment based on the inventory hints."
+      "reason": "The inventory hint does not suggest relevance to the identified task."
     }
   ],
   "missing_sources": [],
@@ -250,176 +273,82 @@ Stage 2 should produce:
 }
 ```
 
-Validation rules:
+`documentation_need` must come from Stage 1 needs or map a Stage 1 need to a concrete source. Stage 3 must not expand the task scope. It may add a technical documentation need only when that need is required to complete the already identified task; uncertain needs must be preserved in `uncertainty_notes` or `missing_sources`.
 
-- `selected_sources` must be a non-empty list.
-- Every selected `path` must exactly match a file discovered under `data/L4_sendit/references`.
-- No absolute paths, parent traversal, URLs, generated paths, or paths outside `data/L4_sendit/references` are allowed.
-- `source_type` must match the discovered file type: `markdown`, `image`, or `other`.
-- `intended_use` must be one of `text_fact_extraction`, `image_fact_extraction`, `template_reference`, or `supporting_context`.
-- `confidence` must be within `0.0` to `1.0`.
-- `missing_sources` and `uncertainty_notes` must be lists.
-- If a required source category is missing, the app must fail before Stage 3 instead of guessing.
+### Boundaries
 
-Required source categories for the current workflow:
+Stage 3 may use AI only to choose from the inventory.
 
-| Required category | Why it is needed | Expected source pattern |
-|---|---|---|
-| declaration template | Preserve final declaration format | `zalacznik-E.md` |
-| broad SPK rules | Route/category/payment reasoning in later stages | `index.md` |
-| disabled route evidence | Confirm route status for `Gdańsk` to `Żarnowiec` | `trasy-wylaczone.png` |
-| wagon capacity | Calculate additional wagons deterministically | `dodatkowe-wagony.md` |
-| WDP meaning | Keep WDP interpretation traceable | `zalacznik-G.md` |
+Stage 3 must not:
 
-#### Stage 2 Prompt Plan
-
-Stage 2 prompt should be scoped to source selection only:
-
-```text
-Task:
-Select local SPK reference files that later extraction stages should inspect.
-
-Context:
-<validated parsed command summary>
-<deterministic reference inventory with path, type, size, and short hint>
-
-Constraints:
-- Choose only paths from the provided inventory.
-- Do not extract facts from the references.
-- Do not infer route codes, category, payment, wagons, or declaration text.
-- Include a short reason and intended_use for each selected source.
-- Report missing or uncertain source needs explicitly.
-- Return only JSON matching the selected sources schema.
-
-Output format:
-<selected sources schema>
-```
-
-#### Stage 2 Boundaries
-
-Stage 2 may use AI only to rank or choose from the deterministic local reference inventory.
-
-Stage 2 must not:
-
-- read full reference contents into the model,
-- extract facts from markdown files,
-- use vision/OCR on `trasy-wylaczone.png`,
-- decide the final route, category, payment, WDP, or declaration text,
+- invent paths,
+- use absolute paths, URLs, or parent traversal,
+- extract facts from selected documents,
+- decide final route, category, payment, wagon count, WDP, or declaration text,
 - write outside `data/L4_sendit/output`,
-- submit anything to the Hub.
+- submit anything externally.
 
-Deterministic code remains responsible for discovering reference files, building the inventory, checking selected paths, enforcing allowed source types, writing artifacts, and stopping on invalid or incomplete selection.
+### Validation
 
-#### Stage 2 Guardrails
+Deterministic validation must confirm:
 
-Every real model run must stay within the application model-call guard:
+- `selected_sources` is non-empty unless `missing_sources` explains why the task cannot proceed,
+- every selected and rejected path exactly matches an inventory path,
+- selected `source_type` matches inventory source type,
+- `documentation_need`, `reason`, and `intended_use` are present,
+- missing source needs are preserved,
+- uncertainty is preserved,
+- no downstream facts or final answers are smuggled into the response.
 
-```text
-DEFAULT_MAX_MODEL_REQUESTS = 1
-```
+The validator must not require a hard-coded source category such as `WDP meaning`. If WDP is needed for a specific command, that need must originate from task understanding, source selection reasoning, or later evidence requirements for that command.
 
-Model output must be treated as untrusted until deterministic validation confirms:
-
-- schema shape is valid,
-- selected paths are known local inventory paths,
-- required source categories are covered,
-- selected source types match discovered file types,
-- uncertainty and missing-source notes are preserved,
-- no downstream extraction or reasoning fields were smuggled into the response.
-
-#### Stage 2 Artifacts
-
-Stage 2 should save:
+### Artifacts
 
 | Path | Purpose |
 |---|---|
-| `data/L4_sendit/output/reference_inventory.json` | Deterministically built local source inventory |
-| `data/L4_sendit/output/selected_sources.json` | Validated source selection consumed by later stages |
-| `data/L4_sendit/output/model_source_selection_raw.json` | Raw source selection model response without secrets |
-| `data/L4_sendit/output/run_report.md` | Add source selection summary and validation results |
+| `data/L4_sendit/output/selected_sources.json` | Validated task-specific source selection |
+| `data/L4_sendit/output/model_source_selection_raw.json` | Raw model response without secrets |
 
-#### Stage 2 Acceptance Criteria
+## Stage 4: Evidence Extraction
 
-Stage 2 is complete when:
+Stage 4 extracts evidence from selected sources according to the identified task.
 
-1. The app builds a deterministic inventory of files under `data/L4_sendit/references`.
-2. The model receives only the parsed command summary and compact inventory, not full reference contents.
-3. `selected_sources.json` contains only validated local reference paths.
-4. The selected sources cover the required categories for template, broad rules, disabled route evidence, wagon capacity, and WDP meaning.
-5. Invalid, unknown, absolute, URL, or out-of-directory paths fail before Stage 3.
-6. `run_report.md` explains selected sources, rejected sources, missing sources, uncertainty, and validation status.
-7. Stage 2 does not change declaration rendering or Hub submission behavior.
+The reason for this stage is traceability: later task execution should use facts with source references and uncertainty, not unsupported model memory.
 
-### Stage 3: Text Fact Extraction
+This design follows `_agent/references/L1_structured_outputs_and_validation.md`: model output is untrusted until schema and evidence validation pass.
 
-Stage 3 is the third implementation step. It adds AI-assisted extraction of traceable facts from markdown reference files selected by Stage 2.
+### Goal
 
-The reason for this stage is educational: a model can read selected text references and extract candidate facts with evidence, while deterministic code keeps file loading, source boundaries, schema validation, required-fact validation, and downstream decisions outside the model.
+Create a validated evidence package that contains only facts supported by selected local sources.
 
-This design follows `_agent/references/L1_task_decomposition_and_pipeline_design.md`, `_agent/references/L1_prompt_design.md`, `_agent/references/L1_structured_outputs_and_validation.md`, and `_agent/references/L2_context_routing_and_tool_exposure.md`.
-
-#### Stage 3 Goal
-
-Use validated Stage 1 command data and validated Stage 2 selected markdown sources to extract structured text facts needed by later reasoning stages.
-
-Stage 3 should answer this narrow question:
+Stage 4 should answer:
 
 ```text
-What facts are explicitly supported by the selected markdown SPK references?
+What task-relevant facts are explicitly supported by the selected sources?
 ```
 
-Stage 3 output is a text-fact evidence artifact, not a final declaration decision.
-
-#### Stage 3 Inputs
+### Inputs
 
 | Input | Owner | Notes |
 |---|---|---|
-| `data/L4_sendit/output/parsed_command.json` | Stage 1 | Used only as task context for relevant fact targets |
-| `data/L4_sendit/output/selected_sources.json` | Stage 2 | Must already pass source selection validation |
-| selected markdown files | deterministic code | Load only selected local sources whose `source_type` is `markdown` |
-| selected source metadata | deterministic code | Include path and intended use next to the text content |
+| `data/L4_sendit/output/task_understanding.json` | Stage 1 | Defines the current task and known inputs |
+| `data/L4_sendit/output/selected_sources.json` | Stage 3 | Defines allowed sources |
+| selected local source files | deterministic code | Load only selected files |
 
-Stage 3 should load selected markdown files such as:
-
-| Path | Expected purpose |
-|---|---|
-| `data/L4_sendit/references/index.md` | broad SPK rules, category/payment rules, route exception rules |
-| `data/L4_sendit/references/zalacznik-E.md` | declaration template structure |
-| `data/L4_sendit/references/dodatkowe-wagony.md` | standard and additional wagon capacity |
-| `data/L4_sendit/references/zalacznik-G.md` | WDP meaning |
-
-Stage 3 must not load or analyze `data/L4_sendit/references/trasy-wylaczone.png`; image-based route evidence is reserved for Stage 4.
-
-#### Stage 3 Fact Targets
-
-Stage 3 should extract only text-supported facts. The current workflow needs these text fact targets before later stages can reason safely:
-
-| Fact name | Source expectation | Purpose |
-|---|---|---|
-| `declaration_template_fields` | `zalacznik-E.md` | Preserve required declaration structure |
-| `strategic_transport_category_rule` | `index.md` or another selected markdown rule source | Support later category reasoning for reactor fuel cassettes |
-| `disabled_route_exception_rule` | `index.md` or another selected markdown rule source | Preserve the textual rule that may allow selected disabled routes by category |
-| `system_funded_categories` | `index.md` or another selected markdown rule source | Support later payment reasoning |
-| `standard_capacity_kg` | `dodatkowe-wagony.md` | Support deterministic wagon calculation |
-| `additional_wagon_capacity_kg` | `dodatkowe-wagony.md` | Support deterministic wagon calculation |
-| `wdp_meaning` | `zalacznik-G.md` | Keep WDP interpretation traceable |
-
-If a target is not present in selected markdown, the model must add it to `missing_facts` instead of guessing.
-
-#### Stage 3 Output Schema
-
-Stage 3 should produce:
+### Output Schema
 
 ```json
 {
   "facts": [
     {
-      "name": "additional_wagon_capacity_kg",
-      "value": "500",
-      "unit": "kg",
-      "source_path": "data/L4_sendit/references/dodatkowe-wagony.md",
-      "evidence_note": "Short note identifying the relevant rule or section.",
-      "evidence_quote": "Short exact evidence excerpt from the source.",
+      "name": "declaration_template_fields",
+      "value": ["sender", "route", "category"],
+      "source_path": "data/L4_sendit/references/zalacznik-E.md",
+      "source_type": "markdown",
+      "evidence_kind": "text_quote",
+      "evidence_note": "The source lists required declaration fields.",
+      "evidence_quote": "Short exact excerpt from the source.",
+      "evidence_locator": null,
       "confidence": 0.0,
       "uncertainty_notes": []
     }
@@ -428,134 +357,252 @@ Stage 3 should produce:
   "conflicts": [],
   "source_coverage": [
     {
-      "path": "data/L4_sendit/references/dodatkowe-wagony.md",
+      "path": "data/L4_sendit/references/zalacznik-E.md",
       "used": true,
-      "notes": "Provided wagon capacity facts."
+      "notes": "Provided declaration format evidence."
     }
   ]
 }
 ```
 
-Validation rules:
+Fact names should be derived from the task requirements and selected documentation needs. They must not be a fixed global list for every command.
 
-- `facts` must be a non-empty list.
-- `name` must be one of the approved Stage 3 fact targets.
-- `source_path` must exactly match a selected markdown source path from Stage 2.
-- `source_path` must not point to image sources, unselected files, URLs, absolute paths, or paths outside `data/L4_sendit/references`.
-- `evidence_quote` must be present, short, and found in the loaded source text.
-- numeric facts such as `standard_capacity_kg` and `additional_wagon_capacity_kg` must parse to positive integers with `unit = "kg"`.
-- `confidence` must be within `0.0` to `1.0`.
-- `missing_facts`, `conflicts`, and `uncertainty_notes` must be preserved and reported.
-- if required text fact targets are missing or conflicted, the app must fail before Stage 5 declaration reasoning.
+`evidence_kind` must be one of:
 
-#### Stage 3 Prompt Plan
+- `text_quote` for evidence quoted from markdown text,
+- `image_region` for evidence tied to a visible image/table area,
+- `image_description` for visual evidence that can be described but not quoted exactly.
 
-Stage 3 prompt should be scoped to text extraction only:
+`evidence_quote` is required for markdown facts and optional for image facts. `evidence_locator` is optional for markdown facts and should be used for image facts when a row, column, region, or visible table entry can be identified.
 
-```text
-Task:
-Extract explicit facts from selected markdown SPK references.
+### Boundaries
 
-Context:
-<validated parsed command summary>
-<selected markdown source metadata>
-<contents of selected markdown sources only>
-<approved Stage 3 fact target list>
+Stage 4 may use AI for:
 
-Constraints:
-- Extract only facts explicitly supported by the provided markdown text.
-- Include source_path, evidence_note, and a short exact evidence_quote for every fact.
-- Do not use image sources.
-- Do not use unselected files.
-- Do not decide final route, category, payment, WDP, or declaration text.
-- Do not guess missing facts. Add them to missing_facts.
-- Preserve conflicts instead of resolving them silently.
-- Return only JSON matching the extracted facts schema.
+- extracting facts from selected markdown text,
+- extracting visible information from selected images,
+- reporting uncertainty and conflicts.
 
-Output format:
-<extracted facts schema>
-```
+Stage 4 must not:
 
-#### Stage 3 Boundaries
-
-Stage 3 may use AI only to extract facts from selected markdown text.
-
-Stage 3 must not:
-
+- load unselected sources,
 - select new sources,
-- load or analyze image sources,
-- use vision/OCR,
-- infer facts from filenames alone,
-- decide final route code or route status from `trasy-wylaczone.png`,
-- calculate WDP or final wagon count,
-- select the final shipment category or payment amount,
-- render or submit the declaration.
+- execute the final task,
+- make unsupported domain decisions,
+- render or submit the final output.
 
-Deterministic code remains responsible for loading selected markdown files, checking path boundaries, batching or chunking text if needed, validating evidence quotes against source text, validating required facts, writing artifacts, and stopping on invalid or incomplete extraction.
+### Validation
 
-#### Stage 3 Guardrails
+Deterministic validation must confirm:
 
-Every real model run must stay within the application model-call guard:
+- every fact source path was selected in Stage 3,
+- source type matches the selected source,
+- markdown evidence quotes are present in the loaded text,
+- image evidence includes enough location or description to inspect the claim,
+- conflicts are preserved,
+- required task evidence is present or listed in `missing_facts`,
+- the app stops when missing evidence blocks safe execution.
 
-```text
-DEFAULT_MAX_MODEL_REQUESTS = 1
-```
-
-If selected markdown content later becomes too large for one safe prompt, Stage 3 must be explicitly redesigned before implementation. Do not silently add multiple model calls or broad chunking outside this reviewed scope.
-
-Model output must be treated as untrusted until deterministic validation confirms:
-
-- schema shape is valid,
-- facts use only approved names,
-- every evidence source is a selected markdown file,
-- evidence quotes are present in the source text,
-- required fact targets are covered or explicitly missing,
-- numeric values are parseable where required,
-- conflicts and uncertainty are preserved.
-
-#### Stage 3 Artifacts
-
-Stage 3 should save:
+### Artifacts
 
 | Path | Purpose |
 |---|---|
-| `data/L4_sendit/output/text_extraction_context.json` | Selected markdown source metadata and content hashes used for extraction |
-| `data/L4_sendit/output/extracted_text_facts.json` | Validated text facts with evidence |
-| `data/L4_sendit/output/model_text_fact_extraction_raw.json` | Raw text extraction model response without secrets |
-| `data/L4_sendit/output/extracted_facts.json` | Combined fact artifact, initially populated with text facts and later extended by Stage 4 |
-| `data/L4_sendit/output/run_report.md` | Add text fact extraction summary and validation results |
+| `data/L4_sendit/output/evidence_package.json` | Validated facts with source evidence |
+| `data/L4_sendit/output/model_evidence_extraction_raw.json` | Raw model response without secrets |
+| `data/L4_sendit/output/evidence_context.json` | Selected source metadata, content hashes, and extraction scope |
 
-#### Stage 3 Acceptance Criteria
+## Stage 5: Task Execution
 
-Stage 3 is complete when:
+Stage 5 executes the identified task using validated command data and validated evidence.
 
-1. The app loads only selected markdown sources from Stage 2.
-2. The model receives only the parsed command summary, selected markdown metadata, selected markdown text, and approved fact targets.
-3. `extracted_text_facts.json` contains validated facts with source paths and evidence quotes.
-4. Evidence quotes are verified against the loaded source text before downstream use.
-5. Required text fact targets are either present and valid or listed as missing with a blocking validation error.
-6. Image-derived route evidence remains untouched for Stage 4.
-7. Stage 3 does not change declaration rendering or Hub submission behavior.
+The reason for this stage is separation of responsibility: source reading and evidence extraction should finish before the app decides the final answer.
+
+This design follows `_agent/references/L1_task_decomposition_and_pipeline_design.md`: keep dependencies between steps explicit and validate model outputs before downstream use.
+
+### Goal
+
+Produce a structured task result that can be validated and rendered.
+
+For the known `spk_transport_declaration` task, this stage may build declaration data. For another command, this stage should route to the executor that matches the identified task.
+
+In the current planned scope, `spk_transport_declaration` is the concrete supported task. Additional command types require their own executor implementations before the app may execute them.
+
+### Inputs
+
+| Input | Owner | Notes |
+|---|---|---|
+| `data/L4_sendit/output/task_understanding.json` | Stage 1 | Task identity and command inputs |
+| `data/L4_sendit/output/evidence_package.json` | Stage 4 | Validated source-backed facts |
+
+### Output Schema
+
+```json
+{
+  "task_name": "spk_transport_declaration",
+  "result_kind": "declaration_data",
+  "result": {
+    "sender_identifier": "450202122",
+    "origin_point": "Gdańsk",
+    "destination_point": "Żarnowiec",
+    "route_code": "X-01",
+    "category": "A",
+    "contents": "kasety z paliwem do reaktora",
+    "declared_weight_kg": 2800,
+    "wdp": 4,
+    "special_notes": "brak",
+    "amount_due_pp": 0
+  },
+  "evidence_links": [
+    {
+      "result_field": "route_code",
+      "fact_name": "route_code_rule"
+    }
+  ],
+  "uncertainty_notes": []
+}
+```
+
+The example above is task-specific. Fields such as `wdp` may appear for a transport declaration only when the task and evidence require them.
+
+### Boundaries
+
+Stage 5 may use AI only for interpretation when validated evidence leaves more than one plausible answer.
+
+Stage 5 should keep deterministic code responsible for:
+
+- routing by `task_name`,
+- selecting a registered executor for the task,
+- stable arithmetic,
+- schema conversion,
+- required field checks,
+- applying explicit validation rules,
+- refusing unsupported outputs.
+
+Stage 5 must not:
+
+- read new documentation directly,
+- rely on raw unvalidated model responses,
+- invent evidence for missing facts,
+- submit externally.
+
+### Validation
+
+Deterministic validation must confirm:
+
+- `task_name` matches Stage 1,
+- `task_name` maps to a registered executor before task execution begins,
+- the selected executor declares the supported `result_kind`,
+- the produced `result_kind` is supported by the selected executor,
+- required result fields are present for that task,
+- result fields have evidence links when evidence is required,
+- stable calculations are reproducible in code,
+- uncertainty is preserved.
+
+If no executor is registered for the identified `task_name`, the app must fail with a clear unsupported-task error before task execution. The model must not invent a fallback executor, unsupported result shape, or synthetic final answer for an unsupported task.
+
+<p style="color: #b45309;"><strong>Design note.</strong> The app could be designed so a general LLM tries to handle unsupported commands without a registered executor. This workflow intentionally does not do that, because it would give the model too much freedom, make validation weaker, and move too much execution responsibility from deterministic code to a probabilistic component. Please note that in a production setting, an unsupported command should not only fail fast. It should also be routed to a human operator for review and handling. That human handoff is not part of the current MVP2 scope, but it is the recommended business-oriented design for unsupported task types.</p>
+
+### Artifacts
+
+| Path | Purpose |
+|---|---|
+| `data/L4_sendit/output/task_result.json` | Validated structured result before rendering |
+| `data/L4_sendit/output/model_task_execution_raw.json` | Raw model response when Stage 5 uses AI |
+
+## Stage 6: Validation And Rendering
+
+Stage 6 validates and renders the final deliverable.
+
+The reason for this stage is reliability: the final output should be generated from a validated task result, not free-form model text.
+
+### Goal
+
+Create the final output requested by the command.
+
+### Inputs
+
+| Input | Owner | Notes |
+|---|---|---|
+| `data/L4_sendit/output/task_understanding.json` | Stage 1 | Expected output kind and success criteria |
+| `data/L4_sendit/output/task_result.json` | Stage 5 | Validated structured task result |
+| `data/L4_sendit/output/evidence_package.json` | Stage 4 | Evidence needed for format-sensitive rendering |
+
+### Rendering Rules
+
+For text outputs, deterministic code should render from a schema and template. For JSON outputs, deterministic code should serialize a validated model. For unsupported output kinds, the app should fail with a clear message.
+
+For `spk_transport_declaration`, declaration text should be rendered from validated declaration data and the selected declaration format evidence.
+
+### Validation
+
+Deterministic validation must confirm:
+
+- final output kind matches Stage 1,
+- all required task-specific fields are present,
+- formatting rules are satisfied,
+- no raw secrets are included,
+- output can be inspected before optional submission.
+
+### Artifacts
+
+| Path | Purpose |
+|---|---|
+| `data/L4_sendit/output/final_output.txt` | Final rendered text when the task produces text |
+| `data/L4_sendit/output/final_output.json` | Final rendered JSON when the task produces JSON |
+| `data/L4_sendit/output/declaration.txt` | Compatibility output for SPK declaration tasks |
+
+## Stage 7: Reporting And Optional Submission
+
+Stage 7 writes the run report and optionally submits the result.
+
+The reason for this stage is operational safety: reporting and submission should be separated from reasoning and rendering.
+
+### Goal
+
+Save an audit trail and submit only when explicitly requested.
+
+### Inputs
+
+| Input | Owner | Notes |
+|---|---|---|
+| all validated stage artifacts | deterministic code | Used for reporting |
+| `--submit` flag | user | Required for external submission |
+
+### Rules
+
+- The app must write a report for every run.
+- Submission must be disabled by default.
+- Submission must require `--submit`.
+- API keys, tokens, private URLs, and credentials must never be written to source files, docs, committed artifacts, or reports.
+- Payload artifacts must mask or omit secrets.
+
+### Artifacts
+
+| Path | Purpose |
+|---|---|
+| `data/L4_sendit/output/run_report.md` | Human-readable execution summary |
+| `data/L4_sendit/output/verification_payload.json` | Optional masked submission payload |
+| `data/L4_sendit/output/hub_response.json` | Optional response saved after explicit submission |
 
 ## Model Selection Plan
 
-MVP2 should use the smallest capable model for each step. Model names are configured as explicit application defaults in `config.py`, not in `.env`, because model choice is a design decision rather than a secret. If provider capabilities, pricing, or course constraints change, update these defaults intentionally with the related README note.
+MVP2 should use the smallest capable model for each AI-assisted step. Model names are application settings in `config.py`, not secrets.
 
-| Step | Planned model class | Config default | Reason | Validation strength |
-|---|---|---|---|---|
-| AI Command Parser | lightweight text model | `DEFAULT_COMMAND_PARSE_MODEL = "gpt-5.4-mini"` | Narrow extraction from one command is simple and strongly validated. | high |
-| Source Selection | lightweight text model | `DEFAULT_SOURCE_SELECTION_MODEL = "gpt-5.4-mini"` | The model ranks a small list of local reference filenames and summaries. | high |
-| Text Fact Extraction | lightweight or mid-strength text model | `DEFAULT_TEXT_EXTRACTION_MODEL = "gpt-5.4-mini"` | Extraction may span longer markdown files, but facts must include evidence. | medium-high |
-| Image Fact Extraction | vision-capable model | `DEFAULT_VISION_EXTRACTION_MODEL = "gpt-5.4-mini"` | The step must read image/table content from `trasy-wylaczone.png`. | medium |
-| Reasoned Declaration Model | mid-strength text model | `DEFAULT_REASONING_MODEL = "gpt-5.5"` | The model may propose interpretations and uncertainty notes from extracted facts. | medium |
+| Step | Planned model class | Config default | Concrete model | Reason | Validation strength |
+|---|---|---|---|---|---|
+| Command Understanding | lightweight text model | `DEFAULT_COMMAND_PARSE_MODEL` | `gpt-5.4-mini` | One command, structured task extraction, strongly validated. | high |
+| Source Selection | lightweight text model | `DEFAULT_SOURCE_SELECTION_MODEL` | `gpt-5.4-mini` | Selects from compact local inventory only. | high |
+| Text Evidence Extraction | lightweight text model | `DEFAULT_TEXT_EXTRACTION_MODEL` | `gpt-5.4-mini` | Reads selected markdown and returns evidence-backed facts. | medium-high |
+| Vision Evidence Extraction | vision-capable model | `DEFAULT_VISION_EXTRACTION_MODEL` | `gpt-5.4-mini` | Reads selected image/table sources and returns inspectable visual evidence. | medium |
+| Task Execution | mid-strength text model only when interpretation is needed | `DEFAULT_REASONING_MODEL` | `gpt-5.5` | May resolve ambiguity from validated evidence; deterministic code handles stable logic. | medium |
 
-The code should keep the step name and selected default visible in reports so cost and latency can be reviewed later.
+No model is needed for Reference Inventory, Validation And Rendering, or default Reporting And Optional Submission.
 
-This plan follows `_agent/references/L1_model_selection.md`: simple and strongly validated steps use lighter models; ambiguous or multimodal steps get stronger capability only where needed.
+These concrete model values are part of the design. The matching `config.py` constants should use these defaults unless a later design review changes the model plan.
 
 ## Prompt Plan
 
-Each prompt should be short, scoped to one step, and shaped as:
+Each prompt should be scoped to one stage:
 
 ```text
 Task:
@@ -564,138 +611,28 @@ Constraints:
 Output format:
 ```
 
-Prompts must not include full conversation history, unrelated reference files, secrets, or Hub credentials.
+Prompts must not include full conversation history, secrets, Hub credentials, raw `.env` values, unselected documents, or unrelated artifacts.
 
 | Step | Prompt type | Required context | Hard constraints | Output format |
 |---|---|---|---|---|
-| AI Command Parser | extraction | raw `command.txt` only | preserve Polish text, normalize units, do not infer missing required values | command schema |
-| Source Selection | classification/ranking | command summary plus local reference inventory | choose only existing local paths, explain relevance briefly | selected sources schema |
-| Text Fact Extraction | extraction | selected markdown files only | quote or identify evidence location, do not use unselected files | extracted facts schema |
-| Image Fact Extraction | multimodal extraction | selected image file plus target route | extract only visible information, report uncertainty | image fact schema |
-| Reasoned Declaration Model | synthesis | validated command plus validated extracted facts | keep deterministic calculations in code, preserve uncertainty notes | declaration data schema |
-
-Stage 1 prompt outline:
-
-```text
-Task:
-Extract shipment fields from the command into the required JSON schema.
-
-Context:
-<contents of data/L4_sendit/input/command.txt>
-
-Constraints:
-- Preserve Polish characters and wording.
-- Normalize weight to integer kilograms.
-- Normalize budget to integer PP.
-- Use special_notes = "none" when the command says there are no notes.
-- Do not guess missing required values. Add them to missing_fields.
-- Return only JSON matching the schema.
-
-Output format:
-<command schema fields from Stage 1>
-```
-
-This plan follows `_agent/references/L1_prompt_design.md`: one task per prompt, minimal context, explicit constraints, and explicit output format.
+| Command Understanding | classification and extraction | raw command text only | identify task before source selection, do not infer documentation facts | task understanding schema |
+| Source Selection | source ranking | task understanding plus reference inventory | choose only inventory paths, do not extract facts | selected sources schema |
+| Evidence Extraction | extraction | task understanding plus selected source contents | use only selected files, include evidence, report missing facts | evidence package schema |
+| Task Execution | synthesis | task understanding plus validated evidence | do not invent evidence, keep stable calculations in code | task result schema |
 
 ## Structured Output Schemas
 
 All model outputs consumed by code must be validated before downstream use.
 
-### Command Schema
+| Schema | Stage | Purpose |
+|---|---|---|
+| `TaskUnderstanding` | Stage 1 | Identify task, expected output, supplied inputs, documentation needs, success criteria, uncertainty |
+| `ReferenceInventory` | Stage 2 | Deterministic list of available local files |
+| `SelectedSources` | Stage 3 | Task-specific local documentation selection |
+| `EvidencePackage` | Stage 4 | Source-backed facts, missing facts, conflicts, coverage |
+| `TaskResult` | Stage 5 | Structured result ready for validation and rendering |
 
-Defined in `Stage 1: AI Command Parser`.
-
-### Selected Sources Schema
-
-```json
-{
-  "selected_sources": [
-    {
-      "path": "data/L4_sendit/references/index.md",
-      "source_type": "markdown",
-      "reason": "Contains route and fee rules.",
-      "intended_use": "text_fact_extraction",
-      "confidence": 0.0
-    }
-  ],
-  "rejected_sources": [],
-  "missing_sources": [],
-  "uncertainty_notes": []
-}
-```
-
-Validation rules:
-
-- `path` must point to an existing file under `data/L4_sendit/references`.
-- `source_type` must be one of `markdown`, `image`, or `other`.
-- `intended_use` must be one of `text_fact_extraction`, `image_fact_extraction`, `template_reference`, or `supporting_context`.
-- `confidence` must be within `0.0` to `1.0`.
-- Unknown paths are rejected.
-- Required source categories must be covered before Stage 3 runs.
-
-### Extracted Facts Schema
-
-```json
-{
-  "facts": [
-    {
-      "name": "additional_wagon_capacity_kg",
-      "value": "500",
-      "unit": "kg",
-      "source_path": "data/L4_sendit/references/dodatkowe-wagony.md",
-      "evidence_note": "Short note identifying the relevant rule or section.",
-      "evidence_quote": "Short exact evidence excerpt from the source.",
-      "confidence": 0.0,
-      "uncertainty_notes": []
-    }
-  ],
-  "missing_facts": [],
-  "conflicts": [],
-  "source_coverage": [
-    {
-      "path": "data/L4_sendit/references/dodatkowe-wagony.md",
-      "used": true,
-      "notes": "Provided wagon capacity facts."
-    }
-  ]
-}
-```
-
-Validation rules:
-
-- Stage 3 text facts must use approved text fact names and selected markdown sources only,
-- Stage 4 image facts may later extend the combined artifact with image-derived route evidence,
-- every fact must have `source_path`, `evidence_note`, and `evidence_quote`,
-- evidence sources must be selected local files of the correct source type for the stage,
-- evidence quotes must be verified against loaded source text when the source is markdown,
-- conflicts must be preserved and reported instead of silently resolved.
-
-### Declaration Data Schema
-
-```json
-{
-  "sender_identifier": "450202122",
-  "origin_point": "Gdańsk",
-  "destination_point": "Żarnowiec",
-  "route_code": "X-01",
-  "category": "A",
-  "contents": "kasety z paliwem do reaktora",
-  "declared_weight_kg": 2800,
-  "wdp": 4,
-  "special_notes": "brak",
-  "amount_due_pp": 0,
-  "evidence": {},
-  "uncertainty_notes": []
-}
-```
-
-Validation rules:
-
-- deterministic code calculates `wdp` and wagon capacity,
-- deterministic code validates route/category/payment consistency,
-- declaration rendering consumes this schema only after validation passes.
-
-This plan follows `_agent/references/L1_structured_outputs_and_validation.md`: model output is untrusted until schema and semantic validation pass.
+Validation should fail closed. A warning-only validation failure is not acceptable when downstream execution depends on the data.
 
 ## Context And Tool Plan
 
@@ -703,13 +640,14 @@ MVP2 should pass only the context needed by the current step.
 
 | Step | Context allowed | Context excluded |
 |---|---|---|
-| AI Command Parser | raw command text | SPK references, previous full run reports, Hub response |
-| Source Selection | parsed command summary, reference file inventory, optional short index summary | full contents of all references |
-| Text Fact Extraction | selected markdown files | unselected markdown files, image files |
-| Image Fact Extraction | selected image file and target route | unrelated images or full markdown contents |
-| Reasoned Declaration Model | validated command and validated facts | raw unvalidated model responses |
+| Command Understanding | raw command text | SPK references, previous run reports, Hub data |
+| Source Selection | task understanding, compact inventory | full reference contents, unlisted files |
+| Evidence Extraction | selected source contents, task understanding | unselected files, full reference corpus |
+| Task Execution | task understanding, validated evidence | raw model responses, unvalidated facts |
+| Rendering | validated task result | model tools, raw source corpus |
+| Submission | final output and masked config names | API keys, raw credentials |
 
-The model should not receive filesystem write tools, Hub submission tools, API keys, or authorization decisions. Code owns file loading, path checks, artifact writing, and Hub submission.
+The model should not receive filesystem write tools, Hub submission tools, API keys, private endpoint values, or authorization decisions.
 
 ## Batching And Caching Plan
 
@@ -717,11 +655,11 @@ MVP2 should avoid repeated model calls when a result can be reused safely.
 
 | Step | Batching/caching rule | Freshness rule |
 |---|---|---|
-| AI Command Parser | cache by command file content hash | invalidate when `command.txt` changes |
-| Source Selection | cache by command hash plus reference inventory hash | invalidate when command or reference list changes |
-| Text Fact Extraction | batch selected markdown files when prompt size stays small and traceable | invalidate when selected file content changes |
-| Image Fact Extraction | cache by image file hash and target route | invalidate when image file changes |
-| Reasoned Declaration Model | cache by validated command plus extracted facts hash | invalidate when command or facts change |
+| Command Understanding | cache by command file content hash | invalidate when `command.txt` changes |
+| Reference Inventory | cache by references directory listing and file metadata | invalidate when reference files change |
+| Source Selection | cache by task understanding hash plus inventory hash | invalidate when task or inventory changes |
+| Evidence Extraction | cache by selected source content hash plus task understanding hash | invalidate when selected files or task change |
+| Task Execution | cache by task understanding hash plus evidence package hash | invalidate when task or evidence changes |
 
 Every cached artifact must still pass deterministic validation before reuse.
 
@@ -729,81 +667,7 @@ Every cached artifact must still pass deterministic validation before reuse.
 
 | Date | Scope | Checklist | Result | Approved Implementation Boundary |
 |---|---|---|---|---|
-| 2026-05-05 | Full MVP2 workflow design | `_agent/instructions/llm_design_checklist.md` | PASS | Implement MVP2 stages according to this README; each material design change requires a new checklist review. |
-| 2026-05-05 | MVP2 Stage 2: Source Selection | `_agent/instructions/llm_design_checklist.md` | PASS | Implement Stage 2 source selection only; fact extraction, vision/OCR, declaration reasoning, and Hub submission remain outside this boundary. |
-| 2026-05-05 | MVP2 Stage 3: Text Fact Extraction | `_agent/instructions/llm_design_checklist.md` | PASS | Implement Stage 3 text fact extraction only; image/OCR extraction, final route/category/payment reasoning, declaration rendering, and Hub submission remain outside this boundary. |
-
-### Stage 2 Checklist Evidence
-
-Checklist scope: `MVP2 Stage 2: Source Selection`.
-
-| Checklist item | Status | Evidence note |
-|---|---|---|
-| The application has a clearly defined goal and expected output. | YES | Stage 2 goal is to select local SPK reference files and write `selected_sources.json`; it does not extract facts. |
-| The workflow is split into small steps when one model call would mix multiple responsibilities. | YES | Stage 2 is separated from Stage 1 parsing, Stage 3 text extraction, Stage 4 image extraction, and Stage 5 declaration reasoning. |
-| Deterministic code is planned for stable logic, and LLM calls are reserved for language or reasoning tasks. | YES | Code discovers files, builds inventory, validates paths, writes artifacts, and stops on invalid selection; the model only ranks or chooses sources. |
-| Each planned workflow step has a clear purpose. | YES | Stage 2 purpose is source selection from a compact inventory for later extraction stages. |
-| Each LLM step has a reason for using a model instead of ordinary code. | YES | A model is useful for matching shipment intent to likely relevant reference files when filenames and hints are human-oriented. |
-| The selected model for each step matches the expected difficulty of that step. | YES | Source selection uses `DEFAULT_SOURCE_SELECTION_MODEL = "gpt-5.4-mini"`, a lightweight model for a narrow, strongly validated choice. |
-| Prompts are planned to be short, focused, and limited to the current step. | YES | Stage 2 prompt includes only parsed command summary, compact inventory, constraints, and the selected sources schema. |
-| Structured outputs are planned wherever code will consume the result. | YES | Stage 2 defines a JSON schema with `selected_sources`, `rejected_sources`, `missing_sources`, and `uncertainty_notes`. |
-| The design limits context to only what the current step needs. | YES | The model receives a compact inventory, not full reference contents or previous full reports. |
-| The design limits tool exposure to only the tools needed for the current step. | YES | The model receives no filesystem, Hub, or write tools; code owns discovery, validation, and artifact writing. |
-| The design avoids passing full history, full datasets, or irrelevant examples by default. | YES | Full markdown contents and image bytes are explicitly excluded from Stage 2. |
-| The workflow includes batching or caching where repeated calls are likely. | YES | Existing caching plan caches source selection by command hash plus reference inventory hash, and requires validation before reuse. |
-| The design includes validation before model output is used downstream. | YES | Stage 2 validation checks schema, known local paths, source types, required categories, and uncertainty fields before Stage 3. |
-| The design treats model output as untrusted until validation passes. | YES | Stage 2 guardrails explicitly state that selected paths and source categories are untrusted until deterministic validation passes. |
-| The design keeps authorization, permissions, and risky actions outside the model. | YES | Hub submission, file access, path checks, and writes remain deterministic code responsibilities. |
-| The workflow handles missing required inputs without guessing important values. | YES | Missing source categories must be recorded and cause failure before Stage 3 instead of silent guessing. |
-
-### Stage 3 Checklist Evidence
-
-Checklist scope: `MVP2 Stage 3: Text Fact Extraction`.
-
-| Checklist item | Status | Evidence note |
-|---|---|---|
-| The application has a clearly defined goal and expected output. | YES | Stage 3 goal is to extract explicit text-supported facts into `extracted_text_facts.json` and the combined `extracted_facts.json`. |
-| The workflow is split into small steps when one model call would mix multiple responsibilities. | YES | Stage 3 is separated from source selection, image extraction, declaration reasoning, and Hub submission. |
-| Deterministic code is planned for stable logic, and LLM calls are reserved for language or reasoning tasks. | YES | Code loads selected markdown, checks paths, validates evidence quotes, validates required facts, writes artifacts, and stops on invalid extraction; the model only extracts facts from text. |
-| Each planned workflow step has a clear purpose. | YES | Stage 3 purpose is text fact extraction from selected markdown sources with evidence. |
-| Each LLM step has a reason for using a model instead of ordinary code. | YES | A model is useful for reading selected prose references and mapping relevant passages to structured fact targets with evidence. |
-| The selected model for each step matches the expected difficulty of that step. | YES | Text extraction uses `DEFAULT_TEXT_EXTRACTION_MODEL = "gpt-5.4-mini"`, suitable for selected markdown extraction with deterministic validation. |
-| Prompts are planned to be short, focused, and limited to the current step. | YES | Stage 3 prompt includes parsed command summary, selected markdown metadata/content, approved fact targets, constraints, and schema only. |
-| Structured outputs are planned wherever code will consume the result. | YES | Stage 3 defines structured facts with names, values, units, source paths, evidence notes, evidence quotes, confidence, missing facts, conflicts, and source coverage. |
-| The design limits context to only what the current step needs. | YES | Stage 3 receives selected markdown sources only; image files, unselected files, full history, and Hub data are excluded. |
-| The design limits tool exposure to only the tools needed for the current step. | YES | The model receives no filesystem, Hub, write, or submission tools; code owns loading, validation, and artifact writing. |
-| The design avoids passing full history, full datasets, or irrelevant examples by default. | YES | Stage 3 excludes unselected references and image bytes; it uses selected markdown files from Stage 2 only. |
-| The workflow includes batching or caching where repeated calls are likely. | YES | Existing caching plan caches text extraction by selected file content, and Stage 3 requires redesign before adding broad chunking or multiple model calls. |
-| The design includes validation before model output is used downstream. | YES | Stage 3 validation checks schema, approved fact names, selected markdown source paths, evidence quotes, numeric values, missing facts, and conflicts before Stage 5. |
-| The design treats model output as untrusted until validation passes. | YES | Stage 3 guardrails explicitly require deterministic validation before facts are used downstream. |
-| The design keeps authorization, permissions, and risky actions outside the model. | YES | File access, path checks, writes, declaration rendering, and Hub submission stay outside the model. |
-| The workflow handles missing required inputs without guessing important values. | YES | Missing fact targets must be listed in `missing_facts` and block later declaration reasoning when required facts are absent. |
-
-## Declaration Language
-
-The generated SPK declaration must be written in Polish because the SPK documentation, declaration template, route names, and declared contents use Polish.
-
-Technical code, module names, comments, and documentation stay in English, but values rendered into the declaration should preserve Polish wording such as `Gdańsk`, `Żarnowiec`, and `kasety z paliwem do reaktora`.
-
-## AI Role
-
-AI should be used where the task is language-heavy, ambiguous, or multimodal:
-
-- parsing a natural-language command into structured shipment data,
-- selecting relevant reference files from the documentation index,
-- extracting facts from long or fragmented documentation,
-- reading image-based documentation such as disabled-route tables,
-- explaining uncertainty when a field has more than one plausible interpretation.
-
-Deterministic code should own stable operations:
-
-- loading files from known paths,
-- calculating additional wagons,
-- checking required fields,
-- validating route/category/payment consistency,
-- rendering the declaration from a template,
-- saving output files,
-- sending the optional verification request.
+| 2026-05-06 | MVP2 full workflow | `_agent/instructions/llm_design_checklist.md` | PASS | Implement the full MVP2 workflow described in this README; material LLM design changes require a new review. |
 
 ## Configuration
 
@@ -830,98 +694,74 @@ Do not store real API keys, tokens, private URLs, or credentials in source files
 
 ## Data Locations
 
-All runtime files should live under the repository-level `.\data\L4_sendit` directory.
+All runtime files should live under `data/L4_sendit`.
 
 | Path | Purpose |
 |---|---|
-| `.\data\L4_sendit\input\command.txt` | Operational command received by the app |
-| `.\data\L4_sendit\references\index.md` | Main local SPK documentation entry point |
-| `.\data\L4_sendit\references\*` | Local SPK attachments and supporting reference files |
-| `.\data\L4_sendit\output\parsed_command.json` | Parsed command data |
-| `.\data\L4_sendit\output\model_command_parse_raw.json` | Raw AI command parser response without secrets |
-| `.\data\L4_sendit\output\reference_inventory.json` | Deterministically discovered local reference inventory |
-| `.\data\L4_sendit\output\selected_sources.json` | Validated AI-assisted source selection |
-| `.\data\L4_sendit\output\model_source_selection_raw.json` | Raw AI source selector response without secrets |
-| `.\data\L4_sendit\output\text_extraction_context.json` | Selected markdown metadata and content hashes used for text extraction |
-| `.\data\L4_sendit\output\extracted_text_facts.json` | Validated Stage 3 text facts with source evidence |
-| `.\data\L4_sendit\output\model_text_fact_extraction_raw.json` | Raw AI text fact extractor response without secrets |
-| `.\data\L4_sendit\output\extracted_facts.json` | AI/deterministic extracted facts with evidence |
-| `.\data\L4_sendit\output\declaration_data.json` | Structured declaration model with evidence and uncertainty |
-| `.\data\L4_sendit\output\declaration.txt` | Final declaration string |
-| `.\data\L4_sendit\output\verification_payload.json` | Hub payload without exposing secrets |
-| `.\data\L4_sendit\output\hub_response.json` | Hub response saved only after explicit `--submit` |
-| `.\data\L4_sendit\output\run_report.md` | Human-readable summary of decisions, validations, and risks |
+| `data/L4_sendit/input/command.txt` | Operational command received by the app |
+| `data/L4_sendit/references/*` | Local SPK documentation and attachments |
+| `data/L4_sendit/output/task_understanding.json` | Validated Stage 1 task understanding |
+| `data/L4_sendit/output/model_task_understanding_raw.json` | Raw Stage 1 model response without secrets |
+| `data/L4_sendit/output/reference_inventory.json` | Deterministic local reference inventory |
+| `data/L4_sendit/output/selected_sources.json` | Validated task-specific source selection |
+| `data/L4_sendit/output/model_source_selection_raw.json` | Raw Stage 3 model response without secrets |
+| `data/L4_sendit/output/evidence_context.json` | Evidence extraction scope and content hashes |
+| `data/L4_sendit/output/evidence_package.json` | Validated source-backed evidence |
+| `data/L4_sendit/output/model_evidence_extraction_raw.json` | Raw Stage 4 model response without secrets |
+| `data/L4_sendit/output/task_result.json` | Validated task-specific structured result |
+| `data/L4_sendit/output/model_task_execution_raw.json` | Raw Stage 5 model response when used |
+| `data/L4_sendit/output/final_output.txt` | Final rendered text output, created only for text output tasks |
+| `data/L4_sendit/output/final_output.json` | Final rendered JSON output, created only for JSON output tasks |
+| `data/L4_sendit/output/declaration.txt` | Compatibility output for SPK declaration tasks |
+| `data/L4_sendit/output/verification_payload.json` | Optional masked submission payload |
+| `data/L4_sendit/output/hub_response.json` | Optional response saved after explicit `--submit` |
+| `data/L4_sendit/output/run_report.md` | Human-readable summary of decisions, validations, and risks |
 
-No generated artifact should be written under `.\src\apps\L4_sendit`.
+No generated artifact should be written under `src/apps/L4_sendit`.
 
 ## Run
 
-Stages 1-2 have a runnable implementation. Stage 1 uses AI only for command parsing. Stage 2 uses AI only for source selection from a deterministic local inventory. The app then reuses the deterministic MVP1-compatible pipeline for facts, declaration rendering, local validation, and optional Hub submission.
+The approved design is not fully implemented yet. The commands below describe the planned runtime interface for the MVP2 workflow.
 
-Run with a real guarded model call:
+Planned run with real guarded model calls:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt
 ```
 
-Run local validation with saved model-shaped JSON files instead of real API calls:
-
-```powershell
-.\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --mock-model-output-file .\data\L4_sendit\output\model_command_parse_raw.json --mock-source-selection-output-file .\data\L4_sendit\output\model_source_selection_raw.json
-```
-
-Optional submission:
+Planned optional submission:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --submit
 ```
 
-The `--submit` flag should be the only path that sends a real request to the Hub.
-
 ## Main Modules
 
-Planned modules:
+Planned module responsibilities:
 
-| Path | Responsibility |
+| Module | Responsibility |
 |---|---|
-| `config.py` | Load secret/private endpoint configuration, runtime paths, model defaults, and model-call limits |
-| `models.py` | Define command, extracted fact, declaration, and validation data structures |
-| `command_parser.py` | Convert the operational command into structured shipment data |
-| `reference_loader.py` | Load local documentation and discover included reference files |
-| `source_selector.py` | Select relevant reference files for the current command |
-| `fact_extractor.py` | Extract text-based facts from markdown references |
-| `image_fact_extractor.py` | Extract facts from image references with vision or OCR |
-| `reasoning.py` | Combine shipment data and extracted facts into a declaration model |
-| `declaration_builder.py` | Render the final declaration text from the template |
-| `validator.py` | Check required fields, calculations, formatting, and known consistency rules |
-| `hub_client.py` | Submit the final payload to the Hub when explicitly requested |
-| `output.py` | Save declaration text, structured data, payload, and debug reports |
-
-Current implemented Stage 1-2 files:
-
-| Path | Responsibility |
-|---|---|
-| `__init__.py` | Define the MVP2 package |
-| `config.py` | Load paths, model defaults, and model-call guard values |
-| `models.py` | Define parsed command, reference inventory, selected source, and validation structures |
-| `command_parser.py` | Run the guarded AI parser or validate a saved model-shaped JSON payload |
-| `reference_inventory.py` | Build a deterministic inventory of local SPK reference files |
-| `source_selector.py` | Run the guarded AI source selector or validate a saved model-shaped JSON payload |
-| `validator.py` | Validate parsed command and selected source outputs before downstream use |
-| `report_builder.py` | Render the Stage 1-2 run report |
-| `main.py` | Run Stage 1-2 and reuse the deterministic MVP1-compatible declaration pipeline |
-| `docs/L4_sendit_MVP2_README.md` | MVP2 design and implementation notes |
+| `config.py` | Resolve paths, model settings, guards, and secret-backed runtime configuration |
+| `models.py` | Define task understanding, inventory, selection, evidence, task result, and validation structures |
+| `task_understanding.py` | Implement Stage 1 command understanding |
+| `reference_inventory.py` | Implement Stage 2 deterministic reference inventory |
+| `source_selector.py` | Implement Stage 3 task-specific source selection |
+| `fact_extractor.py` | Implement Stage 4 text and media evidence extraction |
+| `task_executor.py` | Route Stage 5 execution by task name |
+| `declaration_builder.py` | Implement the executor or executor helper for `spk_transport_declaration` |
+| `validator.py` | Validate every stage boundary before downstream use |
+| `report_builder.py` | Write run reports and uncertainty summaries |
+| `main.py` | Orchestrate stages and optional submission |
 
 ## Verification
 
-Local verification should run before any Hub submission:
+After implementation, the simplest verification should be:
 
-1. Confirm that AI output matches the expected structured schema.
-2. Confirm that the app records evidence for derived facts.
-3. Confirm that Polish declaration values remain in Polish.
-4. Confirm that image extraction found or preserved the route evidence.
-5. Confirm that deterministic validation passes before rendering.
-6. Confirm that no model call loop can exceed the configured request limit.
-7. Confirm that final declaration field order and separators match the template.
-
-Hub verification should be explicit and guarded by `--submit`.
+1. Run the app against `data/L4_sendit/input/command.txt` without `--submit`.
+2. Confirm `task_understanding.json` identifies the requested task.
+3. Confirm `selected_sources.json` contains only local inventory paths and no fixed global requirements.
+4. Confirm `evidence_package.json` contains evidence only from selected sources.
+5. Confirm `task_result.json` validates before rendering for supported tasks.
+6. Confirm unsupported `task_name` values fail before task execution with a clear executor-related error.
+7. Confirm `run_report.md` explains task identity, selected sources, evidence, uncertainty, and validation results.
+8. Confirm no external submission happens without `--submit`.

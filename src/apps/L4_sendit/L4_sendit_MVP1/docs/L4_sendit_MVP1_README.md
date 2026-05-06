@@ -20,9 +20,9 @@
 
 ## Purpose
 
-`L4_sendit_MVP1` is a learning version of the SPK declaration app. It is intentionally simple, explicit, and deterministic.
+`L4_sendit_MVP1` is a learning version of the SPK declaration app for the known course command. It is intentionally simple, explicit, and deterministic.
 
-The goal is not to build a production document-understanding system. The goal is to understand the shape of the pipeline before adding AI in MVP2.
+The goal is not to build a production document-understanding system. The goal is to understand the deterministic declaration pipeline, visible intermediate artifacts, local validation, and guarded submission.
 
 ## Learning Rationale
 
@@ -53,7 +53,7 @@ MVP1 should be built in four small stages:
 | 1. Static MVP | Load known input and render a first `declaration.txt` with explicit facts. | `declaration.txt` |
 | 2. Transparent Pipeline | Save what each step produced. | `parsed_command.json`, `extracted_facts.json`, `declaration_data.json`, `run_report.md` |
 | 3. Local Validation | Check required fields, calculations, Polish declaration values, and template formatting. | validation section in `run_report.md` |
-| 4. AI Boundary | Mark which parts will later move to MVP2 AI components. | documented TODOs, not model calls |
+| 4. AI Boundary | Mark which parts are useful comparison points for the AI-assisted workflow. | documented TODOs, not model calls |
 
 ## Workflow
 

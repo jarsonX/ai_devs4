@@ -27,23 +27,23 @@ MVP1 marks future AI insertion points with visible code comments that start with
 # === AI_BOUNDARY TODO ========================================================
 ```
 
-These comments are intentionally louder than normal purpose comments so a reader can scan the code and immediately find places where MVP2 may evolve.
+These comments are intentionally louder than normal purpose comments so a reader can scan the code and immediately find deterministic steps that are useful comparison points for the AI-assisted workflow.
 
-Current AI boundaries:
+Current AI comparison points:
 
-- `command_parser.py`: fixed-format parsing may become bounded AI command parsing with structured output validation.
-- `fact_extractor.py`: manual facts may become source selection, text extraction, image extraction, and evidence synthesis.
-- `validator.py`: deterministic validation should remain, but AI may help explain uncertainty when evidence conflicts.
+- `command_parser.py`: fixed-format parsing shows the expected command data shape for AI command understanding.
+- `fact_extractor.py`: manual facts show why task-specific source selection, text extraction, image extraction, and evidence packaging are useful.
+- `validator.py`: deterministic validation shows which checks should remain outside model control.
 
 ## Design Decisions
 
-Manual facts stay in MVP1 because the learning goal is to expose the basic pipeline before adding model behavior. This makes the data flow easier to inspect:
+Manual facts stay in MVP1 because the learning goal is to expose the basic deterministic pipeline without model behavior. This makes the data flow easier to inspect:
 
 ```text
 command.txt -> parsed command -> static facts -> declaration data -> declaration.txt
 ```
 
-Stage 2 and Stage 3 artifacts make that flow visible before MVP2 adds AI:
+Stage 2 and Stage 3 artifacts make that flow visible for comparison with AI-assisted artifacts:
 
 - `data/L4_sendit/output/parsed_command.json`
 - `data/L4_sendit/output/extracted_facts.json`
@@ -80,11 +80,12 @@ MVP1 was submitted to the course Hub successfully. The Hub accepted the generate
 
 ## Open Questions
 
-- MVP2 should still replace the manual route confirmation with vision/OCR or another inspectable extraction step.
+- Which MVP2 evidence extraction strategy should be used for image references: direct vision, OCR, or another inspectable extraction step?
 
 ## Future Work
 
-- Add bounded AI command parsing with a schema and deterministic validation.
-- Add relevant-source selection for local SPK references.
-- Add multimodal extraction for image references.
-- Keep local validation deterministic even after AI extraction is introduced.
+- Keep MVP1 as the deterministic baseline for the known course command.
+- Implement bounded AI command understanding with a schema and deterministic validation in MVP2.
+- Implement task-specific source selection for local SPK references in MVP2.
+- Implement multimodal evidence extraction for selected image references in MVP2.
+- Keep local validation deterministic in the AI-assisted workflow.
