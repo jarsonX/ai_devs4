@@ -21,6 +21,7 @@ from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     EvidencePackage,
     SelectedSource,
     SelectedSources,
+    SourceCoverage,
     SupportedTaskDefinition,
     TaskUnderstanding,
 )
@@ -409,6 +410,7 @@ def _build_result(
         if loaded_source.text_content is not None
     }
     _repair_markdown_evidence_quotes(evidence_package, markdown_source_texts)
+    _repair_source_coverage(evidence_package, loaded_sources)
     validation_results = validate_evidence_package(
         evidence_package=evidence_package,
         evidence_context=evidence_context,
@@ -424,6 +426,36 @@ def _build_result(
         raw_model_response=raw_model_response,
         evidence_context=evidence_context,
     )
+
+
+# Repair source_coverage so every selected source is represented exactly once.
+def _repair_source_coverage(
+    evidence_package: EvidencePackage,
+    loaded_sources: list[_LoadedSource],
+) -> None:
+    used_paths = {fact.source_path for fact in evidence_package.facts}
+    coverage_by_path = {coverage.path: coverage for coverage in evidence_package.source_coverage}
+    repaired_coverage: list[SourceCoverage] = []
+
+    for loaded_source in loaded_sources:
+        existing_coverage = coverage_by_path.get(loaded_source.path)
+        if existing_coverage is not None:
+            repaired_coverage.append(existing_coverage)
+            continue
+
+        repaired_coverage.append(
+            SourceCoverage(
+                path=loaded_source.path,
+                used=loaded_source.path in used_paths,
+                notes=(
+                    "Used for extracted evidence facts."
+                    if loaded_source.path in used_paths
+                    else "Selected for the current task, but no retained evidence facts were extracted from this source."
+                ),
+            )
+        )
+
+    evidence_package.source_coverage = repaired_coverage
 
 
 # Repair markdown evidence quotes when the model returns a near-match instead of an exact substring.

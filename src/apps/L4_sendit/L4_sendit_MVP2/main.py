@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.apps.L4_sendit.L4_sendit_MVP2.config import (
     build_app_paths,
+    load_hub_config,
     load_model_config,
 )
 from src.apps.L4_sendit.L4_sendit_MVP2.fact_extractor import (
@@ -21,6 +22,7 @@ from src.apps.L4_sendit.L4_sendit_MVP2.source_selector import (
     select_sources_from_mock,
     select_sources_with_ai,
 )
+from src.apps.L4_sendit.L4_sendit_MVP2.submission_handler import prepare_reporting_and_optional_submission
 from src.apps.L4_sendit.L4_sendit_MVP2.task_executor import execute_task
 from src.apps.L4_sendit.L4_sendit_MVP2.task_registry import build_supported_task_map
 from src.apps.L4_sendit.L4_sendit_MVP2.task_understanding import (
@@ -113,6 +115,11 @@ def main() -> None:
         evidence_package=evidence_extraction_result.evidence_package,
     )
     raise_if_rendered_output_invalid(rendered_output_validation_results)
+    reporting_and_submission = prepare_reporting_and_optional_submission(
+        rendered_output=rendered_output,
+        submit=args.submit,
+        hub_config=load_hub_config() if args.submit else None,
+    )
     report_text = build_run_report(
         command_file=str(paths.command_file.relative_to(paths.repo_root)),
         task_understanding=task_understanding_result.task_understanding,
@@ -127,6 +134,7 @@ def main() -> None:
         task_result_validation_results=task_result_validation_results,
         rendered_output=rendered_output,
         rendered_output_validation_results=rendered_output_validation_results,
+        reporting_and_submission=reporting_and_submission,
         model_source=task_understanding_model_source,
         source_selection_model_source=source_selection_model_source,
         evidence_extraction_model_source=evidence_extraction_model_source,
@@ -149,7 +157,10 @@ def main() -> None:
         save_json(paths.final_output_json_file, rendered_output.final_output_json)
     if rendered_output.compatibility_declaration_text is not None:
         save_text(paths.declaration_output_file, rendered_output.compatibility_declaration_text)
+    save_json(paths.verification_payload_output_file, reporting_and_submission.masked_verification_payload)
     save_run_report(paths.run_report_output_file, report_text)
+    if reporting_and_submission.hub_response is not None:
+        save_json(paths.hub_response_output_file, reporting_and_submission.hub_response)
 
 
 # Parse command-line arguments for the MVP2 Stage 1-6 runner.
@@ -178,6 +189,11 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Optional JSON file that replaces the real Stage 4 model call.",
+    )
+    parser.add_argument(
+        "--submit",
+        action="store_true",
+        help="Submit the rendered declaration to the course Hub.",
     )
 
     return parser.parse_args()

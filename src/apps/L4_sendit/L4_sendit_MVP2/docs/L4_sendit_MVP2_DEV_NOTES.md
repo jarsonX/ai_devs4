@@ -5,7 +5,7 @@
 - [Issues Summary](#issues-summary)
 - [Issue 1: declaration_builder](#issue-1-declaration_builder)
 - [Issue 2: WDP](#issue-2-wdp)
-- [Thoughts After Stage 5 Implementation](#thoughts-after-stage-5-implementation)
+- [Completion Notes](#completion-notes)
 
 ## Issues Summary
 
@@ -157,11 +157,22 @@ That gap mattered because:
 - `fact_extractor.py` was then updated so markdown quote repair can recover short contiguous multi-line spans when one fact is supported by more than one adjacent line.
 - `source_selector.py` was then updated with stricter terminology guidance and a lightweight deterministic correction for clearly terminology-oriented sources.
 
-## Thoughts After Stage 5 Implementation
+## Completion Notes
 
-Stage 5 works for the current task, and the `declaration_builder` issue is now closed:
+The implementation is now complete for the currently supported task:
 
-- Category A is no longer assigned inside the known task executor; it is extracted in Stage 4 as `shipment_category`.
-- WDP still uses the physical number of additional wagons, but it is now paired with generic terminology evidence extracted in Stage 4 as `resolved_terms`.
+- Stage 1 through Stage 7 are implemented.
+- Stage 6 renders the final declaration text deterministically from validated data and template evidence.
+- Stage 7 writes a masked verification payload for every run and performs Hub submission only behind `--submit`.
+- A real OpenAI-powered `--submit` run completed successfully and the Hub accepted the generated declaration.
 
-This means the pipeline already works through Stage 5 for the supported task, and the main known work now shifts from Stage 5 evidence semantics to the still-design-only Stage 6 and Stage 7.
+The final architecture keeps the intended division of responsibility:
+
+- AI handles command understanding, source selection, evidence extraction, and interpretive uncertainty.
+- Deterministic code handles validation, arithmetic, rendering, artifact writing, and guarded submission.
+
+The most reusable lesson from MVP2 is that the app became reliable only after the evidence contract was treated as a first-class boundary:
+
+- Stage 5 stopped hiding business interpretation inside executor-local code.
+- Stage 4 gained enough repair/normalization logic to tolerate minor model variability without weakening validation.
+- Stage 6 and Stage 7 remained deterministic, which made final rendering and submission auditable and safe.

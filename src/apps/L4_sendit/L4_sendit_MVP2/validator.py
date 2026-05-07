@@ -159,9 +159,7 @@ def validate_evidence_package(
 ) -> list[ValidationResult]:
     _ = supported_tasks
     results: list[ValidationResult] = []
-    selected_sources_by_path: dict[str, SelectedSource] = {
-        source.path: source for source in selected_sources.selected_sources
-    }
+    selected_sources_by_path = _group_selected_sources_by_path(selected_sources.selected_sources)
 
     results.extend(_validate_evidence_fact_source_membership(evidence_package, selected_sources_by_path))
     results.extend(_validate_evidence_fact_source_types(evidence_package, selected_sources_by_path))
@@ -646,12 +644,12 @@ def _validate_source_selection_boundaries(selected_sources: SelectedSources) -> 
 # Validate that every fact comes from a Stage 3 selected source path.
 def _validate_evidence_fact_source_membership(
     evidence_package: EvidencePackage,
-    selected_sources_by_path: dict[str, SelectedSource],
+    selected_sources_by_path: dict[str, list[SelectedSource]],
 ) -> list[ValidationResult]:
     invalid_paths = [
         fact.source_path
         for fact in evidence_package.facts
-        if fact.source_path not in selected_sources_by_path
+        if _normalize_artifact_path(fact.source_path) not in selected_sources_by_path
     ]
     if invalid_paths:
         return [
@@ -667,16 +665,19 @@ def _validate_evidence_fact_source_membership(
 # Validate that fact source types match the Stage 3 selection.
 def _validate_evidence_fact_source_types(
     evidence_package: EvidencePackage,
-    selected_sources_by_path: dict[str, SelectedSource],
+    selected_sources_by_path: dict[str, list[SelectedSource]],
 ) -> list[ValidationResult]:
     mismatches: list[str] = []
     for fact in evidence_package.facts:
-        selected_source = selected_sources_by_path.get(fact.source_path)
-        if selected_source is None:
+        matching_sources = selected_sources_by_path.get(_normalize_artifact_path(fact.source_path))
+        if matching_sources is None:
             continue
-        if fact.source_type != selected_source.source_type:
+        if not any(fact.source_type == selected_source.source_type for selected_source in matching_sources):
             mismatches.append(
-                f"{fact.source_path}: fact={fact.source_type}, selected={selected_source.source_type}"
+                (
+                    f"{fact.source_path}: fact={fact.source_type}, "
+                    f"selected={','.join(sorted({source.source_type for source in matching_sources}))}"
+                )
             )
 
     if mismatches:
@@ -750,9 +751,9 @@ def _validate_image_evidence_details(evidence_package: EvidencePackage) -> list[
 # Validate that source coverage references every selected source exactly once.
 def _validate_source_coverage(
     evidence_package: EvidencePackage,
-    selected_sources_by_path: dict[str, SelectedSource],
+    selected_sources_by_path: dict[str, list[SelectedSource]],
 ) -> list[ValidationResult]:
-    coverage_paths = [coverage.path for coverage in evidence_package.source_coverage]
+    coverage_paths = [_normalize_artifact_path(coverage.path) for coverage in evidence_package.source_coverage]
     invalid_paths = [
         path
         for path in coverage_paths
@@ -844,7 +845,7 @@ def _validate_resolved_terms_fact(
     matching_sources = [
         selected_source
         for selected_source in selected_sources.selected_sources
-        if selected_source.path == resolved_terms_fact.source_path
+        if _normalize_artifact_path(selected_source.path) == _normalize_artifact_path(resolved_terms_fact.source_path)
     ]
     if matching_sources and not any(
         source.documentation_need == "declaration terminology" for source in matching_sources
@@ -901,7 +902,7 @@ def _validate_known_task_category_fact(
     matching_sources = [
         selected_source
         for selected_source in selected_sources.selected_sources
-        if selected_source.path == shipment_category_fact.source_path
+        if _normalize_artifact_path(selected_source.path) == _normalize_artifact_path(shipment_category_fact.source_path)
     ]
     if not matching_sources:
         return []
@@ -1306,3 +1307,18 @@ def _normalize_category_symbol(category_value: str) -> str:
 def _term_list_contains_prefix(term_entries: list[str], term_name: str) -> bool:
     normalized_prefix = f"{term_name.strip().upper()} ="
     return any(term_entry.strip().upper().startswith(normalized_prefix) for term_entry in term_entries)
+
+
+# Group selected sources by normalized artifact path while preserving duplicates with different needs.
+def _group_selected_sources_by_path(selected_sources: list[SelectedSource]) -> dict[str, list[SelectedSource]]:
+    grouped_sources: dict[str, list[SelectedSource]] = {}
+    for selected_source in selected_sources:
+        normalized_path = _normalize_artifact_path(selected_source.path)
+        grouped_sources.setdefault(normalized_path, []).append(selected_source)
+
+    return grouped_sources
+
+
+# Normalize artifact paths so validation is robust to slash and case differences.
+def _normalize_artifact_path(path: str) -> str:
+    return path.replace("\\", "/").strip().lower()

@@ -3,6 +3,7 @@
 from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     EvidencePackage,
     ReferenceInventoryItem,
+    ReportingAndSubmissionResult,
     RenderedOutputResult,
     SelectedSources,
     TaskResult,
@@ -26,6 +27,7 @@ def build_run_report(
     task_result_validation_results: list[ValidationResult],
     rendered_output: RenderedOutputResult | None,
     rendered_output_validation_results: list[ValidationResult],
+    reporting_and_submission: ReportingAndSubmissionResult | None,
     model_source: str,
     source_selection_model_source: str | None,
     evidence_extraction_model_source: str | None,
@@ -80,6 +82,7 @@ def build_run_report(
     task_result_lines = _build_task_result_lines(task_result)
     task_uncertainty_lines = _build_task_result_uncertainty_lines(task_result)
     rendered_output_lines = _build_rendered_output_lines(rendered_output)
+    reporting_lines = _build_reporting_and_submission_lines(reporting_and_submission)
 
     return "\n".join(
         [
@@ -128,6 +131,9 @@ def build_run_report(
             "",
             "## Rendered Output Validation",
             *rendered_output_validation_lines,
+            "",
+            "## Reporting And Submission",
+            *reporting_lines,
             "",
             "## Documentation Needs",
             *documentation_need_lines,
@@ -261,5 +267,24 @@ def _build_rendered_output_lines(rendered_output: RenderedOutputResult | None) -
         lines.append(
             "- declaration compatibility output: present"
         )
+
+    return lines
+
+
+# Build report lines for Stage 7 reporting and optional submission status.
+def _build_reporting_and_submission_lines(
+    reporting_and_submission: ReportingAndSubmissionResult | None,
+) -> list[str]:
+    if reporting_and_submission is None:
+        return ["- not run"]
+
+    lines = [
+        f"- submission_requested: `{reporting_and_submission.submission_requested}`",
+        "- verification_payload artifact: present",
+    ]
+    if reporting_and_submission.hub_response is None:
+        lines.append("- hub_response artifact: not created")
+    else:
+        lines.append("- hub_response artifact: present")
 
     return lines

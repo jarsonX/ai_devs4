@@ -51,8 +51,10 @@ Current implementation status:
 - Stage 3 `Source Selection` is implemented.
 - Stage 4 `Evidence Extraction` is implemented.
 - Stage 5 `Task Execution` is implemented for the currently supported known task.
+- Stage 6 `Validation And Rendering` is implemented.
+- Stage 7 `Reporting And Optional Submission` is implemented.
 - The shipment-category refinement for `spk_transport_declaration` is implemented.
-- Later stages remain design-only.
+- The full Stage 1-7 workflow is implemented for the currently supported known task.
 
 Implemented refinements:
 
@@ -64,6 +66,9 @@ Implemented refinements:
 - This refinement passed `_agent/instructions/llm_design_checklist.md` review on 2026-05-07 for terminology evidence in Stage 3 through Stage 5.
 - This refinement is implemented: Stage 3 can now select terminology-oriented sources, Stage 4 can now extract generic `resolved_terms` evidence, and Stage 5 can now consume that validated terminology evidence without adding acronym-specific fact names.
 - A real end-to-end OpenAI run completed successfully after the terminology refinement was implemented and the remaining Stage 3 and Stage 4 blockers were corrected.
+- Stage 6 now renders `final_output.txt` and compatibility `declaration.txt` deterministically from validated task data and declaration-format evidence.
+- Stage 7 now writes a masked `verification_payload.json` for every run and submits to the Hub only when `--submit` is used.
+- A real OpenAI-powered `--submit` run completed successfully and the Hub accepted the generated declaration.
 
 ## Runtime Goal
 
@@ -796,12 +801,18 @@ No generated artifact should be written under `src/apps/L4_sendit`.
 
 ## Run
 
-The approved design is partially implemented. The current runnable interface covers Stage 1 through Stage 5.
+The approved design is implemented for the current supported task. The runnable interface covers Stage 1 through Stage 7.
 
 Run with real guarded model calls:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt
+```
+
+Run with explicit Hub submission:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L4_sendit.L4_sendit_MVP2.main --command-file .\data\L4_sendit\input\command.txt --submit
 ```
 
 Run with a mock Stage 1 response:
@@ -824,7 +835,7 @@ Run with a mock Stage 4 response:
 
 ## Main Modules
 
-Planned module responsibilities:
+Main module responsibilities:
 
 | Module | Responsibility |
 |---|---|
@@ -836,6 +847,9 @@ Planned module responsibilities:
 | `fact_extractor.py` | Implement Stage 4 text and media evidence extraction |
 | `task_executor.py` | Route Stage 5 execution by task name |
 | `declaration_builder.py` | Implement the executor or executor helper for `spk_transport_declaration` |
+| `renderer.py` | Render deterministic Stage 6 final outputs from validated task data |
+| `submission_handler.py` | Build Stage 7 reporting/submission artifacts and guard optional Hub submission |
+| `hub_client.py` | Submit the final declaration payload only when `--submit` is used |
 | `validator.py` | Validate every stage boundary before downstream use |
 | `report_builder.py` | Write run reports and uncertainty summaries |
 | `main.py` | Orchestrate stages and optional submission |
@@ -854,12 +868,16 @@ With the current implementation, the simplest verification is:
 8. Confirm `run_report.md` explains task identity, selected sources, extracted evidence, task result, uncertainty, and validation results.
 9. Confirm unsupported `task_name` values fail before downstream execution with a clear task-registry error.
 10. For the implemented terminology refinement, confirm terminology-dependent fields can be linked to a generic `resolved_terms` evidence fact instead of a one-off acronym-specific fact name.
+11. Confirm `final_output.txt` and `declaration.txt` are rendered from validated Stage 5 data and contain no unresolved template placeholders.
+12. Confirm `verification_payload.json` is written with a masked API key for non-submit runs.
+13. When `--submit` is used, confirm `hub_response.json` is written only after a successful guarded submission attempt.
 
 The current repository state includes a successful real-model run for the supported task:
 
 - `evidence_package.json` includes validated `shipment_category` and `system_funded_categories` evidence
 - `task_result.json` links `category` to `shipment_category`
-- `run_report.md` records a complete Stage 1-5 audit trail
+- `run_report.md` records a complete Stage 1-7 audit trail
+- `final_output.txt` and `declaration.txt` are rendered deterministically from the validated declaration data
 
 The current repository state also includes a successful real-model verification of the terminology refinement:
 
@@ -868,4 +886,8 @@ The current repository state also includes a successful real-model verification 
 - `task_result.json` can link `wdp` to both wagon-capacity facts and `resolved_terms`
 - `run_report.md` confirms that the real OpenAI-powered run passed Stage 3, Stage 4, and Stage 5 validation with terminology evidence enabled
 
-For later stages, keep the design sections in this README as the source of truth until implementation is added.
+The current repository state also includes a successful guarded Hub submission:
+
+- `verification_payload.json` is saved with a masked API key
+- `hub_response.json` records HTTP `200`
+- `run_report.md` records `submission_requested: True` for the explicit `--submit` run

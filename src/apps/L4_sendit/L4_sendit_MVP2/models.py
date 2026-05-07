@@ -238,3 +238,12 @@ class RenderedOutputResult:
     final_output_text: str | None
     final_output_json: dict[str, Any] | None
     compatibility_declaration_text: str | None
+
+
+@dataclass(frozen=True)
+# Store the validated Stage 7 reporting and optional submission artifacts.
+class ReportingAndSubmissionResult:
+    verification_payload: dict[str, Any]
+    masked_verification_payload: dict[str, Any]
+    hub_response: dict[str, Any] | None
+    submission_requested: bool

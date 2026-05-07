@@ -38,6 +38,8 @@ class AppPaths:
     final_output_text_file: Path
     final_output_json_file: Path
     declaration_output_file: Path
+    verification_payload_output_file: Path
+    hub_response_output_file: Path
     run_report_output_file: Path
 
 
@@ -51,6 +53,14 @@ class ModelConfig:
     vision_extraction_model: str
     reasoning_model: str
     max_model_requests: int
+
+
+@dataclass(frozen=True)
+# Store secret-bearing Hub configuration loaded only for explicit submission.
+class HubConfig:
+    api_key: str
+    verify_url: str
+    task_name: str
 
 
 # Build default paths while allowing the command file to be overridden.
@@ -78,6 +88,8 @@ def build_app_paths(command_file: Path | None = None) -> AppPaths:
         final_output_text_file=output_dir / "final_output.txt",
         final_output_json_file=output_dir / "final_output.json",
         declaration_output_file=output_dir / "declaration.txt",
+        verification_payload_output_file=output_dir / "verification_payload.json",
+        hub_response_output_file=output_dir / "hub_response.json",
         run_report_output_file=output_dir / "run_report.md",
     )
 
@@ -104,6 +116,15 @@ def load_model_config() -> ModelConfig:
             DEFAULT_REASONING_MODEL,
         ).strip(),
         max_model_requests=DEFAULT_MAX_MODEL_REQUESTS,
+    )
+
+
+# Load Hub configuration only when the user explicitly requests submission.
+def load_hub_config() -> HubConfig:
+    return HubConfig(
+        api_key=_get_required_env("AI_DEVS_API_KEY"),
+        verify_url=_get_required_env("HUB_VERIFY_URL"),
+        task_name="sendit",
     )
 
 

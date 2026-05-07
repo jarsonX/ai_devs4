@@ -28,4 +28,21 @@ MVP1 should be built as four small learning stages:
 
 ## MVP2 Learning Goal
 
-MVP2 should teach how to design AI as bounded, inspectable workflow stages. The model helps with language-heavy, ambiguous, or multimodal work; deterministic code keeps file access, schemas, validation, rendering, and external submission controlled.
+MVP2 teaches how to design AI as bounded, inspectable workflow stages. The model helps with command understanding, dynamic source selection, evidence extraction, and interpretive uncertainty; deterministic code keeps file access, schemas, validation, rendering, and external submission controlled.
+
+In the completed MVP2 implementation, the supported workflow is:
+
+1. understand the command,
+2. inventory local references,
+3. select task-specific sources,
+4. extract evidence,
+5. execute the known task,
+6. render the final declaration deterministically,
+7. write audit artifacts and optionally submit to the Hub behind `--submit`.
+
+The final learning outcome is not only that AI can help with the ambiguous parts. It is that the application remains reliable only when:
+
+- model output is validated at every stage boundary,
+- evidence is explicit and inspectable before execution,
+- final rendering and submission stay in deterministic code,
+- external submission is guarded and secret-safe by default.
