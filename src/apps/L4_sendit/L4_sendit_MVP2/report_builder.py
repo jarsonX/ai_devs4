@@ -1,8 +1,9 @@
-# Run report rendering for the L4 sendit MVP2 Stage 1-4 workflow.
+# Run report rendering for the L4 sendit MVP2 Stage 1-6 workflow.
 
 from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     EvidencePackage,
     ReferenceInventoryItem,
+    RenderedOutputResult,
     SelectedSources,
     TaskResult,
     TaskUnderstanding,
@@ -23,6 +24,8 @@ def build_run_report(
     evidence_validation_results: list[ValidationResult],
     task_result: TaskResult | None,
     task_result_validation_results: list[ValidationResult],
+    rendered_output: RenderedOutputResult | None,
+    rendered_output_validation_results: list[ValidationResult],
     model_source: str,
     source_selection_model_source: str | None,
     evidence_extraction_model_source: str | None,
@@ -48,6 +51,10 @@ def build_run_report(
         f"- {validation_result.status}: {validation_result.message}"
         for validation_result in task_result_validation_results
     ] or ["- not run"]
+    rendered_output_validation_lines = [
+        f"- {validation_result.status}: {validation_result.message}"
+        for validation_result in rendered_output_validation_results
+    ] or ["- not run"]
     documentation_need_lines = [
         f"- `{documentation_need.need}`: {documentation_need.reason}"
         for documentation_need in task_understanding.documentation_needs
@@ -72,10 +79,11 @@ def build_run_report(
     conflict_lines = _build_conflict_lines(evidence_package)
     task_result_lines = _build_task_result_lines(task_result)
     task_uncertainty_lines = _build_task_result_uncertainty_lines(task_result)
+    rendered_output_lines = _build_rendered_output_lines(rendered_output)
 
     return "\n".join(
         [
-            "# L4 Sendit MVP2 Stage 1-5 Run Report",
+            "# L4 Sendit MVP2 Stage 1-6 Run Report",
             "",
             "## Task Understanding",
             f"- Command file: `{command_file}`",
@@ -114,6 +122,12 @@ def build_run_report(
             "",
             "## Task Result Validation",
             *task_result_validation_lines,
+            "",
+            "## Rendered Output",
+            *rendered_output_lines,
+            "",
+            "## Rendered Output Validation",
+            *rendered_output_validation_lines,
             "",
             "## Documentation Needs",
             *documentation_need_lines,
@@ -231,3 +245,21 @@ def _build_task_result_uncertainty_lines(task_result: TaskResult | None) -> list
         return ["- not run"]
 
     return [f"- {note}" for note in task_result.uncertainty_notes] or ["- none"]
+
+
+# Build report lines for the Stage 6 rendered output artifacts.
+def _build_rendered_output_lines(rendered_output: RenderedOutputResult | None) -> list[str]:
+    if rendered_output is None:
+        return ["- not run"]
+
+    lines = [f"- output_kind: `{rendered_output.output_kind}`"]
+    if rendered_output.final_output_text is not None:
+        lines.append(f"- final_output_text length: `{len(rendered_output.final_output_text)}`")
+    if rendered_output.final_output_json is not None:
+        lines.append("- final_output_json: present")
+    if rendered_output.compatibility_declaration_text is not None:
+        lines.append(
+            "- declaration compatibility output: present"
+        )
+
+    return lines

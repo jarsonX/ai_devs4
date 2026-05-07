@@ -229,3 +229,12 @@ class TaskResult(BaseModel):
 class TaskExecutionResult:
     task_result: TaskResult
     raw_model_response: dict[str, Any]
+
+
+@dataclass(frozen=True)
+# Store the validated Stage 6 rendered output artifacts.
+class RenderedOutputResult:
+    output_kind: str
+    final_output_text: str | None
+    final_output_json: dict[str, Any] | None
+    compatibility_declaration_text: str | None

@@ -1,4 +1,4 @@
-# Command-line entrypoint for the L4 sendit MVP2 Stage 1-5 workflow.
+# Command-line entrypoint for the L4 sendit MVP2 Stage 1-6 workflow.
 
 import argparse
 from pathlib import Path
@@ -12,8 +12,9 @@ from src.apps.L4_sendit.L4_sendit_MVP2.fact_extractor import (
     extract_evidence_with_ai,
     load_mock_evidence_response,
 )
-from src.apps.L4_sendit.L4_sendit_MVP2.output import save_json, save_run_report
+from src.apps.L4_sendit.L4_sendit_MVP2.output import save_json, save_run_report, save_text
 from src.apps.L4_sendit.L4_sendit_MVP2.reference_inventory import build_reference_inventory
+from src.apps.L4_sendit.L4_sendit_MVP2.renderer import render_final_output
 from src.apps.L4_sendit.L4_sendit_MVP2.report_builder import build_run_report
 from src.apps.L4_sendit.L4_sendit_MVP2.source_selector import (
     load_mock_source_selection_response,
@@ -31,13 +32,15 @@ from src.apps.L4_sendit.L4_sendit_MVP2.validator import (
     validate_evidence_package,
     validate_task_result,
     raise_if_reference_inventory_invalid,
+    raise_if_rendered_output_invalid,
     validate_reference_inventory,
+    validate_rendered_output,
     validate_selected_sources,
     validate_task_understanding,
 )
 
 
-# Run MVP2 Stage 1-5: understand the task, build inventory, select sources, extract evidence, execute the task, and save artifacts.
+# Run MVP2 Stage 1-6: understand the task, build inventory, select sources, extract evidence, execute the task, render the final output, and save artifacts.
 def main() -> None:
     args = _parse_args()
     paths = build_app_paths(command_file=args.command_file)
@@ -97,6 +100,19 @@ def main() -> None:
         executor_definition=_get_executor_definition(task_understanding_result.task_understanding.task_name),
         supported_tasks=supported_tasks,
     )
+    rendered_output = render_final_output(
+        task_understanding=task_understanding_result.task_understanding,
+        task_result=task_execution_result.task_result,
+        evidence_package=evidence_extraction_result.evidence_package,
+        repo_root=paths.repo_root,
+    )
+    rendered_output_validation_results = validate_rendered_output(
+        rendered_output=rendered_output,
+        task_understanding=task_understanding_result.task_understanding,
+        task_result=task_execution_result.task_result,
+        evidence_package=evidence_extraction_result.evidence_package,
+    )
+    raise_if_rendered_output_invalid(rendered_output_validation_results)
     report_text = build_run_report(
         command_file=str(paths.command_file.relative_to(paths.repo_root)),
         task_understanding=task_understanding_result.task_understanding,
@@ -109,6 +125,8 @@ def main() -> None:
         evidence_validation_results=evidence_validation_results,
         task_result=task_execution_result.task_result,
         task_result_validation_results=task_result_validation_results,
+        rendered_output=rendered_output,
+        rendered_output_validation_results=rendered_output_validation_results,
         model_source=task_understanding_model_source,
         source_selection_model_source=source_selection_model_source,
         evidence_extraction_model_source=evidence_extraction_model_source,
@@ -125,12 +143,18 @@ def main() -> None:
     save_json(paths.raw_evidence_extraction_output_file, evidence_extraction_result.raw_model_response)
     save_json(paths.task_result_output_file, task_execution_result.task_result)
     save_json(paths.raw_task_execution_output_file, task_execution_result.raw_model_response)
+    if rendered_output.final_output_text is not None:
+        save_text(paths.final_output_text_file, rendered_output.final_output_text)
+    if rendered_output.final_output_json is not None:
+        save_json(paths.final_output_json_file, rendered_output.final_output_json)
+    if rendered_output.compatibility_declaration_text is not None:
+        save_text(paths.declaration_output_file, rendered_output.compatibility_declaration_text)
     save_run_report(paths.run_report_output_file, report_text)
 
 
-# Parse command-line arguments for the MVP2 Stage 1-5 runner.
+# Parse command-line arguments for the MVP2 Stage 1-6 runner.
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the L4 sendit MVP2 Stage 1-5 workflow.")
+    parser = argparse.ArgumentParser(description="Run the L4 sendit MVP2 Stage 1-6 workflow.")
     parser.add_argument(
         "--command-file",
         type=Path,

@@ -1,4 +1,4 @@
-# Path and model configuration for the L4 sendit MVP2 Stage 1-4 workflow.
+# Path and model configuration for the L4 sendit MVP2 Stage 1-6 workflow.
 
 import os
 from dataclasses import dataclass
@@ -19,7 +19,7 @@ DEFAULT_MAX_MODEL_REQUESTS = 1
 
 
 @dataclass(frozen=True)
-# Store repository-relative runtime paths used by the MVP2 Stage 1-4 pipeline.
+# Store repository-relative runtime paths used by the MVP2 Stage 1-6 pipeline.
 class AppPaths:
     repo_root: Path
     command_file: Path
@@ -35,11 +35,14 @@ class AppPaths:
     raw_evidence_extraction_output_file: Path
     task_result_output_file: Path
     raw_task_execution_output_file: Path
+    final_output_text_file: Path
+    final_output_json_file: Path
+    declaration_output_file: Path
     run_report_output_file: Path
 
 
 @dataclass(frozen=True)
-# Store OpenAI-backed Stage 1-4 settings loaded only for real model calls.
+# Store OpenAI-backed Stage 1-6 settings loaded only for real model calls.
 class ModelConfig:
     api_key: str
     command_parse_model: str
@@ -72,6 +75,9 @@ def build_app_paths(command_file: Path | None = None) -> AppPaths:
         raw_evidence_extraction_output_file=output_dir / "model_evidence_extraction_raw.json",
         task_result_output_file=output_dir / "task_result.json",
         raw_task_execution_output_file=output_dir / "model_task_execution_raw.json",
+        final_output_text_file=output_dir / "final_output.txt",
+        final_output_json_file=output_dir / "final_output.json",
+        declaration_output_file=output_dir / "declaration.txt",
         run_report_output_file=output_dir / "run_report.md",
     )
 

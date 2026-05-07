@@ -1,4 +1,4 @@
-# Output helpers for files produced by the L4 sendit MVP2 Stage 1-2 workflow.
+# Output helpers for files produced by the L4 sendit MVP2 Stage 1-6 workflow.
 
 import json
 from dataclasses import asdict, is_dataclass
@@ -21,6 +21,12 @@ def save_json(output_file: Path, data: Any) -> None:
 def save_run_report(output_file: Path, report_text: str) -> None:
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(report_text, encoding="utf-8")
+
+
+# Save a UTF-8 text artifact produced by deterministic rendering.
+def save_text(output_file: Path, text: str) -> None:
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(text, encoding="utf-8")
 
 
 # Convert dataclasses, Pydantic models, and nested values into JSON-ready data.

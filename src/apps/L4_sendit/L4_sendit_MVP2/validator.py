@@ -5,6 +5,7 @@ from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     EvidenceLink,
     EvidencePackage,
     ReferenceInventoryItem,
+    RenderedOutputResult,
     SelectedSource,
     SelectedSources,
     SupportedTaskDefinition,
@@ -81,6 +82,17 @@ def raise_if_task_result_invalid(validation_results: list[ValidationResult]) -> 
     ]
     if error_messages:
         raise ValueError(f"Task result failed validation: {', '.join(error_messages)}")
+
+
+# Raise a single error if any Stage 6 validation result has status ERROR.
+def raise_if_rendered_output_invalid(validation_results: list[ValidationResult]) -> None:
+    error_messages = [
+        validation_result.message
+        for validation_result in validation_results
+        if validation_result.status == "ERROR"
+    ]
+    if error_messages:
+        raise ValueError(f"Rendered output failed validation: {', '.join(error_messages)}")
 
 
 # Validate the deterministic Stage 2 reference inventory before downstream use.
@@ -178,6 +190,21 @@ def validate_task_result(
     results.extend(_validate_task_result_evidence_links(task_result, evidence_package))
     results.extend(_validate_known_task_result_math(task_result, task_understanding, evidence_package))
     results.extend(_validate_task_result_uncertainty(task_result))
+
+    return results
+
+
+# Validate the Stage 6 rendered output before files are written.
+def validate_rendered_output(
+    rendered_output: RenderedOutputResult,
+    task_understanding: TaskUnderstanding,
+    task_result: TaskResult,
+    evidence_package: EvidencePackage,
+) -> list[ValidationResult]:
+    results: list[ValidationResult] = []
+    results.extend(_validate_rendered_output_kind(rendered_output, task_understanding))
+    results.extend(_validate_rendered_output_payload_presence(rendered_output, task_understanding))
+    results.extend(_validate_known_task_rendered_declaration(rendered_output, task_result, evidence_package))
 
     return results
 
@@ -1064,6 +1091,132 @@ def _validate_task_result_uncertainty(task_result: TaskResult) -> list[Validatio
         ]
 
     return [ValidationResult(status="OK", message="task_result has no uncertainty notes")]
+
+
+# Validate that Stage 6 rendered the expected output kind.
+def _validate_rendered_output_kind(
+    rendered_output: RenderedOutputResult,
+    task_understanding: TaskUnderstanding,
+) -> list[ValidationResult]:
+    if rendered_output.output_kind == task_understanding.expected_output_kind:
+        return [ValidationResult(status="OK", message="rendered output kind matches Stage 1 expectation")]
+
+    return [
+        ValidationResult(
+            status="ERROR",
+            message="rendered output kind does not match Stage 1 expectation",
+        )
+    ]
+
+
+# Validate that Stage 6 produced the required payload shape for the output kind.
+def _validate_rendered_output_payload_presence(
+    rendered_output: RenderedOutputResult,
+    task_understanding: TaskUnderstanding,
+) -> list[ValidationResult]:
+    if task_understanding.expected_output_kind == "declaration_text":
+        if not rendered_output.final_output_text:
+            return [ValidationResult(status="ERROR", message="final_output_text is missing for declaration_text")]
+        if not rendered_output.compatibility_declaration_text:
+            return [ValidationResult(status="ERROR", message="declaration compatibility output is missing")]
+        if rendered_output.final_output_text != rendered_output.compatibility_declaration_text:
+            return [
+                ValidationResult(
+                    status="ERROR",
+                    message="declaration compatibility output does not match final_output_text",
+                )
+            ]
+        return [ValidationResult(status="OK", message="declaration text outputs are present and aligned")]
+
+    if task_understanding.expected_output_kind == "json":
+        if rendered_output.final_output_json is None:
+            return [ValidationResult(status="ERROR", message="final_output_json is missing for json output")]
+        return [ValidationResult(status="OK", message="json rendered output is present")]
+
+    return [ValidationResult(status="ERROR", message="rendered output payload shape is unsupported")]
+
+
+# Validate the known declaration rendering contract against task_result and evidence.
+def _validate_known_task_rendered_declaration(
+    rendered_output: RenderedOutputResult,
+    task_result: TaskResult,
+    evidence_package: EvidencePackage,
+) -> list[ValidationResult]:
+    if task_result.task_name != "spk_transport_declaration":
+        return []
+
+    declaration_text = rendered_output.final_output_text
+    if not declaration_text:
+        return [ValidationResult(status="ERROR", message="rendered declaration text is missing")]
+
+    results: list[ValidationResult] = []
+    declaration_template_fields = _find_required_text_list_fact(evidence_package, "declaration_template_fields")
+    missing_field_labels = [
+        field_label
+        for field_label in declaration_template_fields
+        if field_label not in declaration_text
+    ]
+    if missing_field_labels:
+        results.append(
+            ValidationResult(
+                status="ERROR",
+                message=(
+                    "rendered declaration text is missing template field labels: "
+                    f"{', '.join(missing_field_labels)}"
+                ),
+            )
+        )
+    else:
+        results.append(ValidationResult(status="OK", message="rendered declaration text contains template field labels"))
+
+    if "[" in declaration_text and "]" in declaration_text:
+        results.append(
+            ValidationResult(
+                status="ERROR",
+                message="rendered declaration text still contains unresolved template placeholders",
+            )
+        )
+    else:
+        results.append(ValidationResult(status="OK", message="rendered declaration text has no unresolved placeholders"))
+
+    expected_fragments = [
+        task_result.result.origin_point,
+        task_result.result.sender_identifier,
+        task_result.result.destination_point,
+        task_result.result.route_code,
+        task_result.result.category,
+        task_result.result.contents,
+        str(task_result.result.declared_weight_kg),
+        str(task_result.result.wdp),
+        task_result.result.special_notes,
+        f"{task_result.result.amount_due_pp} PP",
+    ]
+    missing_fragments = [
+        fragment
+        for fragment in expected_fragments
+        if fragment not in declaration_text
+    ]
+    if missing_fragments:
+        results.append(
+            ValidationResult(
+                status="ERROR",
+                message="rendered declaration text is missing task_result values",
+            )
+        )
+    else:
+        results.append(ValidationResult(status="OK", message="rendered declaration text includes task_result values"))
+
+    if len(task_result.result.contents) <= 200:
+        results.append(ValidationResult(status="OK", message="rendered declaration contents fit the template limit"))
+    else:
+        results.append(
+            ValidationResult(
+                status="ERROR",
+                message="rendered declaration contents exceed the 200-character template limit",
+            )
+        )
+
+    return results
 
 
 # Check whether one provided input value is non-empty enough for Stage 1.
