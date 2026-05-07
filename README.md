@@ -35,9 +35,9 @@ Runtime data, generated outputs, logs, cache files, downloaded references, and s
 
 The work in this repository follows an author-directed human-AI collaboration model. The author acts as the architect, reviewer, orchestrator, and learner, while AI coding agents support implementation, refactoring, debugging, and documentation.
 
-This is intentionally different from treating an agent as a black-box task solver. For many applications, the workflow includes explicit design discussion, architecture decisions, documentation planning, implementation review, manual code reading, debugging, and follow-up refinement. The goal is to understand the produced code and the design trade-offs behind it, even when the first implementation draft is generated with AI assistance.
+This is intentionally different from treating an agent as a black-box task solver. For all applications, the workflow includes explicit design discussion, architecture decisions, documentation planning, implementation review, manual code reading, debugging, and follow-up refinement. The goal is to understand the produced code and the design trade-offs behind it, even when the first implementation draft is generated with AI assistance.
 
-The repository therefore documents not only final code, but also a way of working: using AI as an engineering partner while preserving human responsibility for direction, validation, learning, and quality.
+The repository therefore documents not only final code, but also a way of working: using AI as an engineering partner while preserving human responsibility for direction, validation, learning, and quality. This is not presented only as a claim. In some places, the repository also includes concrete evidence of that workflow, such as [L4_sendit_MVP2_DEV_NOTES.md](src/apps/L4_sendit/L4_sendit_MVP2/docs/L4_sendit_MVP2_DEV_NOTES.md), where AI-generated implementation choices are explicitly reviewed, challenged, and refined from a developer perspective.
 
 ## What this repository demonstrates
 
@@ -49,6 +49,7 @@ Beyond individual course task solutions, this repository is intended to demonstr
 - adding documentation that explains purpose, workflow, configuration, and verification,
 - treating logs, runtime data, generated outputs, and cache files as separate app data,
 - reviewing AI-generated code instead of accepting it uncritically,
+- documenting review and refinement decisions as portfolio evidence of responsible AI-assisted development,
 - learning from implementation details, bugs, trade-offs, and model behavior.
 
 The code should be read as a learning portfolio: it shows both the resulting applications and the process of becoming more capable at building them.
