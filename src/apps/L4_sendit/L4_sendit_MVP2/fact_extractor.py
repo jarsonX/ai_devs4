@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import mimetypes
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -15,6 +16,7 @@ from src.apps.L4_sendit.L4_sendit_MVP2.config import ModelConfig
 from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     EvidenceContext,
     EvidenceContextSource,
+    EvidenceFact,
     EvidenceExtractionResult,
     EvidencePackage,
     SelectedSource,
@@ -35,6 +37,9 @@ Do not invent facts, final task answers, or unsupported domain conclusions.
 For markdown facts, copy a short exact evidence_quote from the source text.
 For image facts, use evidence_kind image_region or image_description and provide an inspectable evidence_locator.
 If a required fact target is not supported by the provided sources, add it to missing_facts instead of guessing.
+When `shipment_category` is required, classify the shipment from `task_understanding.provided_inputs.contents`
+against the provided category rules source and return only the category symbol such as `A`, `B`, `C`, `D`, `E`, or `X`.
+Preserve confidence and uncertainty when the category mapping is interpretive rather than explicit.
 Return only JSON matching the requested schema.
 """
 
@@ -60,7 +65,7 @@ KNOWN_TASK_FACT_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
     "spk_transport_declaration": {
         "declaration format": ("declaration_template_fields",),
         "route availability and route code": ("route_code", "route_status"),
-        "category rules": ("disabled_route_exception",),
+        "category rules": ("shipment_category", "disabled_route_exception"),
         "payment rules": ("system_funded_categories",),
         "wagon allocation rules": ("standard_capacity_kg", "additional_wagon_capacity_kg"),
     }
@@ -278,6 +283,7 @@ def _build_text_input(
         [
             "Extract only explicit evidence-backed facts from the provided markdown sources.",
             "Use missing_facts when a required fact target is not explicitly supported.",
+            *_build_task_specific_extraction_guidance(evidence_context),
             "",
             json.dumps(context, ensure_ascii=False, indent=2),
         ]
@@ -323,6 +329,7 @@ def _build_vision_input(
                 [
                     "Extract only explicit evidence-backed facts from the provided markdown sources and attached images.",
                     "Use the attached images for image facts only.",
+                    *_build_task_specific_extraction_guidance(evidence_context),
                     "",
                     json.dumps(context, ensure_ascii=False, indent=2),
                 ]
@@ -354,6 +361,21 @@ def _build_vision_input(
     return [{"role": "user", "content": content}]
 
 
+# Add narrow extraction guidance for task-specific fact targets.
+def _build_task_specific_extraction_guidance(evidence_context: EvidenceContext) -> list[str]:
+    guidance_lines: list[str] = []
+    if "shipment_category" in evidence_context.required_fact_targets:
+        guidance_lines.extend(
+            [
+                "For shipment_category, use the shipment contents from task_understanding.provided_inputs.contents.",
+                "Ground the classification in the selected category rules source, not in route exceptions alone.",
+                "Return the category symbol only in fact.value and explain uncertainty in uncertainty_notes when needed.",
+            ]
+        )
+
+    return guidance_lines
+
+
 # Convert one local image file into a data URL accepted by the Responses API.
 def _to_data_url(image_path: Path, image_bytes: bytes) -> str:
     mime_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
@@ -376,6 +398,7 @@ def _build_result(
         for loaded_source in loaded_sources
         if loaded_source.text_content is not None
     }
+    _repair_markdown_evidence_quotes(evidence_package, markdown_source_texts)
     validation_results = validate_evidence_package(
         evidence_package=evidence_package,
         evidence_context=evidence_context,
@@ -391,6 +414,85 @@ def _build_result(
         raw_model_response=raw_model_response,
         evidence_context=evidence_context,
     )
+
+
+# Repair markdown evidence quotes when the model returns a near-match instead of an exact substring.
+def _repair_markdown_evidence_quotes(
+    evidence_package: EvidencePackage,
+    markdown_source_texts: dict[str, str],
+) -> None:
+    for fact in evidence_package.facts:
+        if fact.source_type != "markdown" or fact.evidence_kind != "text_quote":
+            continue
+
+        source_text = markdown_source_texts.get(fact.source_path)
+        if not source_text:
+            continue
+        if fact.evidence_quote and _normalize_for_quote_match(fact.evidence_quote) in _normalize_for_quote_match(source_text):
+            continue
+
+        repaired_quote = _find_best_quote_line(fact, source_text)
+        if repaired_quote is not None:
+            fact.evidence_quote = repaired_quote
+
+
+# Find one source line that most likely matches the fact when the quote is slightly paraphrased.
+def _find_best_quote_line(fact: EvidenceFact, source_text: str) -> str | None:
+    candidate_lines = [line.strip() for line in source_text.splitlines() if line.strip()]
+    if not candidate_lines:
+        return None
+
+    query_tokens = _build_quote_repair_tokens(fact)
+    if not query_tokens:
+        return None
+
+    scored_candidates: list[tuple[int, str]] = []
+    for candidate_line in candidate_lines:
+        candidate_tokens = set(_tokenize_for_quote_repair(candidate_line))
+        score = sum(1 for token in query_tokens if token in candidate_tokens)
+        if score > 0:
+            scored_candidates.append((score, candidate_line))
+
+    if not scored_candidates:
+        return None
+
+    scored_candidates.sort(key=lambda item: item[0], reverse=True)
+    best_score, best_line = scored_candidates[0]
+    second_best_score = scored_candidates[1][0] if len(scored_candidates) > 1 else 0
+
+    if best_score < 3:
+        return None
+    if best_score == second_best_score:
+        return None
+
+    return best_line.removeprefix("- ").strip()
+
+
+# Build search tokens from the model-produced fact for deterministic quote repair.
+def _build_quote_repair_tokens(fact: EvidenceFact) -> list[str]:
+    token_sources: list[str] = [fact.name.replace("_", " "), fact.evidence_note]
+    if fact.evidence_quote:
+        token_sources.append(fact.evidence_quote)
+
+    if isinstance(fact.value, str):
+        token_sources.append(fact.value)
+    elif isinstance(fact.value, int):
+        token_sources.append(str(fact.value))
+    elif isinstance(fact.value, list):
+        token_sources.extend(item for item in fact.value if isinstance(item, str))
+
+    tokens = _tokenize_for_quote_repair(" ".join(token_sources))
+    return [token for token in tokens if len(token) > 1 or token in {"a", "b", "c", "d", "e", "x"}]
+
+
+# Tokenize text for robust source-line matching during quote repair.
+def _tokenize_for_quote_repair(text: str) -> list[str]:
+    return re.findall(r"[0-9A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż]+", text.lower())
+
+
+# Normalize whitespace so quote validation and repair tolerate line-wrap differences.
+def _normalize_for_quote_match(text: str) -> str:
+    return " ".join(text.split())
 
 
 # Accept either a raw schema object or a wrapper with evidence_package.

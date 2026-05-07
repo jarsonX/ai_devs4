@@ -11,15 +11,19 @@
 
 | Issue | Status |
 |---|---|
-| `declaration_builder` | <span style="color: #b45309;"><strong>Not resolved</strong></span> |
+| `declaration_builder` | <span style="color: #15803d;"><strong>Resolved</strong></span> |
 | `WDP` | <span style="color: #b45309;"><strong>Not resolved</strong></span> |
 
 ## Issue 1: declaration_builder
-***Status:*** <span style="color: #b45309;"><strong>Not resolved</strong></span>
+***Status:*** <span style="color: #15803d;"><strong>Resolved</strong></span>
 
-During a manual review of AI-generated code, the following approach was found in `.\src\apps\L4_sendit\L4_sendit_MVP2\declaration_builder.py`:
+### Original problem
 
-```
+This issue was identified during manual review of AI-generated code by the developer. That review caught a design flaw which the pipeline itself did not expose at the time.
+
+The previous implementation contained the following executor-local category rule:
+
+```python
 def _resolve_known_task_category(
     contents: str,
     route_status: str,
@@ -51,71 +55,61 @@ def _resolve_known_task_category(
     raise ValueError("Known declaration executor cannot resolve the shipment category from current evidence.")
 ```
 
-This is a poor design because the category is assigned based on the keywords `"reaktor"`, `"paliw"`, and `"wy"`. As a result, any package that does not contain those keywords would not be assigned to category A, even if it should in fact be treated that way.
+This rule assigned category `A` based on local string matching in the executor. That was a poor design because:
 
-### Cause
+- it hid category interpretation inside Stage 5 instead of exposing it as evidence,
+- it would not generalize to other valid category-A cases,
+- it made validation weaker because the final result did not depend on an explicit evidence-backed category fact.
+
+### Root cause
+
+- The issue was detected by the user during manual verification of AI-generated code.
 - The code was proposed by an AI agent (AI responsibility).
-- The documentation in `.\src\apps\L4_sendit\L4_sendit_MVP2\docs` does not define clearly enough how this should be handled (human responsibility).
+- The earlier app design did not define clearly enough that shipment classification should be extracted before task execution (human responsibility).
 
-### Supporting documentation
-Based on `.\data\L4_sendit\references\index.md` (section `"4. KLASYFIKACJA PRZESYŁEK"`, subsection `"4.1. Kategorie przesyłek"`), the categories are described as follows:
+### Implemented solution
 
-```
-4. KLASYFIKACJA PRZESYŁEK
+- Stage 4 now extracts `shipment_category` from the selected `category rules` source as an evidence-backed fact.
+- Stage 5 no longer assigns category with a hard-coded keyword rule in `declaration_builder.py`.
+- `task_result.category` now links to `shipment_category` in `evidence_links`.
+- The executor preserves Stage 4 uncertainty notes and confidence context instead of hiding interpretation inside local deterministic code.
 
-4.1. Kategorie przesyłek
+### Implementation notes
 
-Każda przesyłka przyjmowana do SPK musi zostać zaklasyfikowana do jednej z następujących kategorii:
+- `fact_extractor.py` now requires `shipment_category` for the `category rules` documentation need.
+- `validator.py` now validates that `shipment_category` uses a supported symbol and comes from a source selected for `category rules`.
+- A deterministic markdown quote-repair step was added in Stage 4 to recover exact `evidence_quote` text when the model returns a close paraphrase instead of a literal substring.
 
-**Kategoria A - Strategiczna**  
-Przesyłki o znaczeniu krytycznym dla funkcjonowania Systemu i infrastruktury. Obejmuje: podzespoły elektroniczne, części zamienne do automatów kontrolnych, moduły komunikacyjne, ogniwa paliwowe, materiały do naprawy torów.  
-Uprawnienia do nadawania: wyłącznie jednostki autoryzowane przez System  
-Priorytet transportu: najwyższy  
-Czas dostawy: maksymalnie 24 godziny w obrębie jednego regionu  
+### Verification
 
-**Kategoria B - Medyczna**  
-Przesyłki związane ze zdrowiem i bezpieczeństwem sanitarnym ludności. Obejmuje: leki, szczepionki, sprzęt medyczny, próbki laboratoryjne, środki dezynfekcyjne.  
-Uprawnienia do nadawania: placówki medyczne z aktualną autoryzacją  
-Priorytet transportu: bardzo wysoki  
-Czas dostawy: maksymalnie 36 godzin w obrębie jednego regionu  
+- A real OpenAI-powered end-to-end run completed successfully after the refinement was implemented.
+- The resulting `data/L4_sendit/output/evidence_package.json` contains validated `shipment_category` evidence.
+- The resulting `data/L4_sendit/output/task_result.json` links `category` to `shipment_category` instead of the old local rule.
 
-**Kategoria C - Żywnościowa**  
-Transport żywności między osadami, z farm do centrów dystrybucyjnych, z magazynów do punktów wydawania. Obejmuje: produkty spożywcze, nasiona, nawozy, pasze.  
-Uprawnienia do nadawania: farmy kolektywne, magazyny centralne, autoryzowani producenci  
-Priorytet transportu: wysoki  
-Czas dostawy: maksymalnie 48 godzin w obrębie jednego regionu  
+### Remaining caveat
 
-**Kategoria D - Gospodarcza**  
-Przesyłki związane z codziennym funkcjonowaniem osad. Obejmuje: narzędzia, materiały budowlane, odzież, środki higieny, opał.  
-Uprawnienia do nadawania: jednostki administracyjne osad, autoryzowani rzemieślnicy  
-Priorytet transportu: standardowy  
-Czas dostawy: maksymalnie 7 dni w obrębie jednego regionu  
-
-**Kategoria E - Osobista**  
-Przesyłki nadawane przez osoby fizyczne do innych osób fizycznych. Obejmuje: listy, drobne przedmioty osobiste, pamiątki.  
-Uprawnienia do nadawania: każdy obywatel z aktualnym identyfikatorem Systemu  
-Priorytet transportu: najniższy  
-Czas dostawy: bez gwarancji - zależny od dostępności miejsca w wagonach  
-
-**Kategoria X - Zakazana**  
-Kategoria obejmująca przedmioty, których przesyłanie jest bezwzględnie zakazane. Obejmuje: broń i amunicja (z wyjątkiem autoryzowanych transferów między garnizonami), materiały wybuchowe, substancje radioaktywne, nośniki danych niezatwierdzone przez System, urządzenia nadawcze nieautoryzowane, organizmy żywe (z wyjątkiem nasion i kultur bakteryjnych kat. B), alkohol powyżej 1 litra na przesyłkę, książki i publikacje bez stempla cenzury Systemu.
-```
-
-### Solution to be implemented
-- The application should assign a category based on `.\data\L4_sendit\references\index.md` (section `"4. KLASYFIKACJA PRZESYŁEK"`, subsection `"4.1. Kategorie przesyłek"`). This should be handled by an LLM, and we need a confidence measure.
-- Design note: in a real production application, we would need additional safeguards and verification checks. For example, when the LLM assigns category A, that decision should be approved by a human.
+- The current category decision is still interpretive for `kasety z paliwem do reaktora`. The source text mentions `ogniwa paliwowe`, not the exact shipment phrase, so the model reports uncertainty and non-maximal confidence.
+- In a production application, category-A assignment should likely require a human approval step or an additional business-side safeguard.
 
 ## Issue 2: WDP
 ***Status:*** <span style="color: #b45309;"><strong>Not resolved</strong></span>
 
-According to `.\data\L4_sendit\output\task_result.json`: "Explicit WDP terminology evidence is not yet extracted in Stage 4".
+According to `data/L4_sendit/output/task_result.json`, the current implementation still reports:
 
-WDP seems to be calculated correctly. However, it should be verified how the model handles the `WDP` abbreviation, which according to `zalacznik-G.md` stands for `Wagony Dodatkowe Płatne`. At this point, I am not sure whether this causes any real issues.
+```text
+WDP currently uses the physical additional wagon count for the known task.
+Explicit WDP terminology evidence is not yet extracted in Stage 4.
+```
+
+WDP seems to be calculated correctly. However, it should still be verified how the model handles the `WDP` abbreviation, which according to `zalacznik-G.md` stands for `Wagony Dodatkowe Płatne`.
+
+At the moment, this does not block the supported task flow, but it remains the main known refinement area in Stage 4 and Stage 5.
 
 ## Thoughts After Stage 5 Implementation
 
-Stage 5 works for the current task, but it leaves two uncertainties:
-- Category A is currently an explicit interpretation inside the known task executor.
-- WDP still uses the physical number of additional wagons, without a separate terminological fact extracted in Stage 4 (see WDP above).
+Stage 5 works for the current task, and the `declaration_builder` issue is now closed:
 
-This means the pipeline already works through Stage 5, but these two areas are exactly the points worth refining before Stage 6.
+- Category A is no longer assigned inside the known task executor; it is extracted in Stage 4 as `shipment_category`.
+- WDP still uses the physical number of additional wagons, without a separate terminological fact extracted in Stage 4.
+
+This means the pipeline already works through Stage 5 for the supported task, and WDP remains the primary known refinement area before Stage 6.

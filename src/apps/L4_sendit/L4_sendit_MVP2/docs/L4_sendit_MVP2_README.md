@@ -51,7 +51,15 @@ Current implementation status:
 - Stage 3 `Source Selection` is implemented.
 - Stage 4 `Evidence Extraction` is implemented.
 - Stage 5 `Task Execution` is implemented for the currently supported known task.
+- The shipment-category refinement for `spk_transport_declaration` is implemented.
 - Later stages remain design-only.
+
+Implemented refinement:
+
+- Shipment category classification for `spk_transport_declaration` should move out of the Stage 5 executor and become an evidence-backed Stage 4 result.
+- This refinement passed `_agent/instructions/llm_design_checklist.md` review on 2026-05-07 for the shipment-category flow in Stage 3 through Stage 5.
+- This refinement is implemented: Stage 4 now produces `shipment_category`, and Stage 5 consumes that validated fact instead of applying a hard-coded keyword rule.
+- A real end-to-end OpenAI run completed successfully after the refinement was implemented.
 
 ## Runtime Goal
 
@@ -261,6 +269,8 @@ The model should receive the task understanding and compact inventory only. It s
 
 This is a deliberate design choice. The app could be built with a deterministic task-to-files map, but MVP2 assumes that the documentation set may evolve. Stage 3 therefore reasons dynamically over the current inventory: it knows which documentation needs must be covered for the task, but it does not assume in advance which attachment names will satisfy those needs.
 
+For `spk_transport_declaration`, the source-selection design should include documentation that covers shipment classification rules whenever the final declaration requires a shipment category. For the current SPK references, this means the selected package should include the source that defines shipment categories, not only route and capacity sources.
+
 ### Output Schema
 
 ```json
@@ -388,6 +398,14 @@ Fact names should be derived from the task requirements and selected documentati
 
 `evidence_quote` is required for markdown facts and optional for image facts. `evidence_locator` is optional for markdown facts and should be used for image facts when a row, column, region, or visible table entry can be identified.
 
+For `spk_transport_declaration`, Stage 4 should produce an evidence-backed shipment classification fact when the declaration requires a category. The intended Stage 4 fact set for this task therefore includes:
+
+- `shipment_category` as the proposed category symbol such as `A`
+- category evidence from the classification rules source
+- confidence and uncertainty notes when the mapping from shipment contents to category is interpretive rather than explicit
+
+This refinement follows `_agent/references/L1_task_decomposition_and_pipeline_design.md` and `_agent/references/L1_structured_outputs_and_validation.md`: the interpretation step belongs in the evidence-producing stage, and downstream code should consume only validated structured output.
+
 ### Boundaries
 
 Stage 4 may use AI for:
@@ -416,6 +434,8 @@ Deterministic validation must confirm:
 - required task evidence is present or listed in `missing_facts`,
 - the app stops when missing evidence blocks safe execution.
 
+For `spk_transport_declaration`, this means shipment category evidence must be present or explicitly reported missing before Stage 5 may build the declaration result.
+
 ### Artifacts
 
 | Path | Purpose |
@@ -439,6 +459,8 @@ Produce a structured task result that can be validated and rendered.
 For the known `spk_transport_declaration` task, this stage may build declaration data. For another command, this stage should route to the executor that matches the identified task.
 
 In the current planned scope, `spk_transport_declaration` is the concrete supported task. Additional command types require their own executor implementations before the app may execute them.
+
+For the implemented declaration design, Stage 5 does not classify the shipment with a hard-coded keyword rule inside the executor. Instead, it reads a validated Stage 4 fact such as `shipment_category` and fails closed when that fact is missing or too uncertain for safe execution.
 
 ### Inputs
 
@@ -491,6 +513,8 @@ Stage 5 should keep deterministic code responsible for:
 - applying explicit validation rules,
 - refusing unsupported outputs.
 
+Shipment category assignment for `spk_transport_declaration` does not live in Stage 5 hard-coded keyword-matching code. Category interpretation now belongs to Stage 4 as a validated evidence-backed fact, with Stage 5 limited to consuming that fact.
+
 Stage 5 must not:
 
 - read new documentation directly,
@@ -510,6 +534,8 @@ Deterministic validation must confirm:
 - result fields have evidence links when evidence is required,
 - stable calculations are reproducible in code,
 - uncertainty is preserved.
+
+For `spk_transport_declaration`, the validator should treat shipment category as an evidence-required field rather than a locally hard-coded executor detail.
 
 If no executor is registered for the identified `task_name`, the app must fail with a clear unsupported-task error before task execution. The model must not invent a fallback executor, unsupported result shape, or synthetic final answer for an unsupported task.
 
@@ -678,9 +704,12 @@ Every cached artifact must still pass deterministic validation before reuse.
 
 ## LLM Design Reviews
 
+The table below records passed reviews only.
+
 | Date | Scope | Checklist | Result | Approved Implementation Boundary |
 |---|---|---|---|---|
 | 2026-05-06 | MVP2 full workflow | `_agent/instructions/llm_design_checklist.md` | PASS | Implement the full MVP2 workflow described in this README; material LLM design changes require a new review. |
+| 2026-05-07 | Shipment category refinement for `spk_transport_declaration` in Stage 3 through Stage 5 | `_agent/instructions/llm_design_checklist.md` | PASS | Implement only the shipment-category refinement described in this README: include classification-rule source selection, Stage 4 evidence-backed `shipment_category`, and Stage 5 consumption of validated category evidence. |
 
 ## Configuration
 
@@ -786,8 +815,16 @@ With the current implementation, the simplest verification is:
 2. Confirm `task_understanding.json` identifies the requested task.
 3. Confirm `selected_sources.json` contains only local inventory paths and no fixed global requirements.
 4. Confirm `evidence_package.json` contains facts only from selected sources and preserves missing facts instead of guessing.
-5. Confirm `task_result.json` is produced only by the registered executor for the supported task and keeps interpretation risk in `uncertainty_notes`.
-6. Confirm `run_report.md` explains task identity, selected sources, extracted evidence, task result, uncertainty, and validation results.
-7. Confirm unsupported `task_name` values fail before downstream execution with a clear task-registry error.
+5. For the implemented shipment-category refinement, confirm `evidence_package.json` contains a validated `shipment_category` fact or explicitly reports why category evidence is missing.
+6. Confirm `task_result.json` is produced only by the registered executor for the supported task and keeps interpretation risk in `uncertainty_notes`.
+7. For the implemented shipment-category refinement, confirm the Stage 5 executor consumes validated category evidence instead of classifying the shipment with a hard-coded keyword rule.
+8. Confirm `run_report.md` explains task identity, selected sources, extracted evidence, task result, uncertainty, and validation results.
+9. Confirm unsupported `task_name` values fail before downstream execution with a clear task-registry error.
+
+The current repository state includes a successful real-model run for the supported task:
+
+- `evidence_package.json` includes validated `shipment_category` and `system_funded_categories` evidence
+- `task_result.json` links `category` to `shipment_category`
+- `run_report.md` records a complete Stage 1-5 audit trail
 
 For later stages, keep the design sections in this README as the source of truth until implementation is added.

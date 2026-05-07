@@ -5,6 +5,7 @@ from src.apps.L4_sendit.L4_sendit_MVP2.models import (
     EvidenceLink,
     EvidencePackage,
     ReferenceInventoryItem,
+    SelectedSource,
     SelectedSources,
     SupportedTaskDefinition,
     TaskResult,
@@ -144,10 +145,11 @@ def validate_evidence_package(
     markdown_source_texts: dict[str, str],
     supported_tasks: dict[str, SupportedTaskDefinition],
 ) -> list[ValidationResult]:
-    _ = task_understanding
     _ = supported_tasks
     results: list[ValidationResult] = []
-    selected_sources_by_path = {source.path: source for source in selected_sources.selected_sources}
+    selected_sources_by_path: dict[str, SelectedSource] = {
+        source.path: source for source in selected_sources.selected_sources
+    }
 
     results.extend(_validate_evidence_fact_source_membership(evidence_package, selected_sources_by_path))
     results.extend(_validate_evidence_fact_source_types(evidence_package, selected_sources_by_path))
@@ -155,6 +157,7 @@ def validate_evidence_package(
     results.extend(_validate_image_evidence_details(evidence_package))
     results.extend(_validate_source_coverage(evidence_package, selected_sources_by_path))
     results.extend(_validate_required_fact_targets(evidence_package, evidence_context))
+    results.extend(_validate_known_task_category_fact(evidence_package, task_understanding, selected_sources))
     results.extend(_validate_evidence_conflicts_and_missing(evidence_package))
 
     return results
@@ -615,7 +618,7 @@ def _validate_source_selection_boundaries(selected_sources: SelectedSources) -> 
 # Validate that every fact comes from a Stage 3 selected source path.
 def _validate_evidence_fact_source_membership(
     evidence_package: EvidencePackage,
-    selected_sources_by_path: dict[str, object],
+    selected_sources_by_path: dict[str, SelectedSource],
 ) -> list[ValidationResult]:
     invalid_paths = [
         fact.source_path
@@ -636,7 +639,7 @@ def _validate_evidence_fact_source_membership(
 # Validate that fact source types match the Stage 3 selection.
 def _validate_evidence_fact_source_types(
     evidence_package: EvidencePackage,
-    selected_sources_by_path: dict[str, object],
+    selected_sources_by_path: dict[str, SelectedSource],
 ) -> list[ValidationResult]:
     mismatches: list[str] = []
     for fact in evidence_package.facts:
@@ -719,7 +722,7 @@ def _validate_image_evidence_details(evidence_package: EvidencePackage) -> list[
 # Validate that source coverage references every selected source exactly once.
 def _validate_source_coverage(
     evidence_package: EvidencePackage,
-    selected_sources_by_path: dict[str, object],
+    selected_sources_by_path: dict[str, SelectedSource],
 ) -> list[ValidationResult]:
     coverage_paths = [coverage.path for coverage in evidence_package.source_coverage]
     invalid_paths = [
@@ -774,6 +777,63 @@ def _validate_required_fact_targets(
         ]
 
     return [ValidationResult(status="OK", message="required fact targets are extracted or reported missing")]
+
+
+# Validate the known-task shipment category fact shape and source scope.
+def _validate_known_task_category_fact(
+    evidence_package: EvidencePackage,
+    task_understanding: TaskUnderstanding,
+    selected_sources: SelectedSources,
+) -> list[ValidationResult]:
+    if task_understanding.task_name != "spk_transport_declaration":
+        return []
+
+    shipment_category_fact = _find_fact_by_name(evidence_package, "shipment_category")
+    if shipment_category_fact is None:
+        return [
+            ValidationResult(
+                status="OK",
+                message=(
+                    "shipment_category fact is not present in evidence_package; "
+                    "required_fact_targets validation is responsible for reporting this as a blocker "
+                    "when category evidence is required for the current source set"
+                ),
+            )
+        ]
+
+    if not isinstance(shipment_category_fact.value, str):
+        return [
+            ValidationResult(
+                status="ERROR",
+                message="shipment_category fact must be a string value",
+            )
+        ]
+
+    normalized_category = _normalize_category_symbol(shipment_category_fact.value)
+    if normalized_category not in {"A", "B", "C", "D", "E", "X"}:
+        return [
+            ValidationResult(
+                status="ERROR",
+                message=f"shipment_category fact is outside the supported category symbols: {shipment_category_fact.value}",
+            )
+        ]
+
+    matching_sources = [
+        selected_source
+        for selected_source in selected_sources.selected_sources
+        if selected_source.path == shipment_category_fact.source_path
+    ]
+    if not matching_sources:
+        return []
+    if not any(source.documentation_need == "category rules" for source in matching_sources):
+        return [
+            ValidationResult(
+                status="ERROR",
+                message="shipment_category fact must come from a source selected for category rules",
+            )
+        ]
+
+    return [ValidationResult(status="OK", message="shipment_category fact is valid for the known task")]
 
 
 # Preserve missing facts and conflicts as visible downstream signals.
@@ -885,6 +945,7 @@ def _validate_known_task_result_math(
 
     standard_capacity_kg = _find_required_int_fact(evidence_package, "standard_capacity_kg")
     additional_wagon_capacity_kg = _find_required_int_fact(evidence_package, "additional_wagon_capacity_kg")
+    shipment_category = _normalize_category_symbol(_find_required_text_fact(evidence_package, "shipment_category"))
     system_funded_categories = _normalize_category_symbols(
         _find_required_text_list_fact(evidence_package, "system_funded_categories")
     )
@@ -899,6 +960,16 @@ def _validate_known_task_result_math(
         results.append(ValidationResult(status="OK", message="task_result wdp matches deterministic wagon math"))
     else:
         results.append(ValidationResult(status="ERROR", message="task_result wdp does not match deterministic wagon math"))
+
+    if task_result.result.category == shipment_category:
+        results.append(ValidationResult(status="OK", message="task_result category matches shipment_category evidence"))
+    else:
+        results.append(
+            ValidationResult(
+                status="ERROR",
+                message="task_result category does not match shipment_category evidence",
+            )
+        )
 
     if task_result.result.amount_due_pp == 0 and task_result.result.category in system_funded_categories:
         results.append(ValidationResult(status="OK", message="task_result zero-fee path matches funded categories"))
@@ -960,6 +1031,15 @@ def _find_required_int_fact(evidence_package: EvidencePackage, fact_name: str) -
     raise ValueError(f"Required integer evidence fact is missing: {fact_name}")
 
 
+# Find one required string fact from the evidence package.
+def _find_required_text_fact(evidence_package: EvidencePackage, fact_name: str) -> str:
+    for fact in evidence_package.facts:
+        if fact.name == fact_name and isinstance(fact.value, str):
+            return fact.value
+
+    raise ValueError(f"Required text evidence fact is missing: {fact_name}")
+
+
 # Find one required list-of-strings fact from the evidence package.
 def _find_required_text_list_fact(evidence_package: EvidencePackage, fact_name: str) -> list[str]:
     for fact in evidence_package.facts:
@@ -967,6 +1047,15 @@ def _find_required_text_list_fact(evidence_package: EvidencePackage, fact_name: 
             return list(fact.value)
 
     raise ValueError(f"Required text-list evidence fact is missing: {fact_name}")
+
+
+# Find one evidence fact by name when optional semantic checks need the whole object.
+def _find_fact_by_name(evidence_package: EvidencePackage, fact_name: str):
+    for fact in evidence_package.facts:
+        if fact.name == fact_name:
+            return fact
+
+    return None
 
 
 # Calculate the expected WDP value from the current known-task wagon math.
@@ -986,6 +1075,11 @@ def _calculate_expected_wdp(
 def _normalize_category_symbols(category_values: list[str]) -> list[str]:
     normalized_values: list[str] = []
     for category_value in category_values:
-        normalized_values.append(category_value.split(" ", 1)[0].strip())
+        normalized_values.append(_normalize_category_symbol(category_value))
 
     return normalized_values
+
+
+# Normalize one category evidence value such as "A - Strategiczna" into "A".
+def _normalize_category_symbol(category_value: str) -> str:
+    return category_value.split(" ", 1)[0].strip()
