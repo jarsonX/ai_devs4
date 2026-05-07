@@ -54,12 +54,16 @@ Current implementation status:
 - The shipment-category refinement for `spk_transport_declaration` is implemented.
 - Later stages remain design-only.
 
-Implemented refinement:
+Implemented refinements:
 
 - Shipment category classification for `spk_transport_declaration` should move out of the Stage 5 executor and become an evidence-backed Stage 4 result.
 - This refinement passed `_agent/instructions/llm_design_checklist.md` review on 2026-05-07 for the shipment-category flow in Stage 3 through Stage 5.
 - This refinement is implemented: Stage 4 now produces `shipment_category`, and Stage 5 consumes that validated fact instead of applying a hard-coded keyword rule.
 - A real end-to-end OpenAI run completed successfully after the refinement was implemented.
+- Tasks that require interpreting declaration abbreviations or glossary terms should use a terminology-oriented documentation need instead of one hard-coded fact per acronym.
+- This refinement passed `_agent/instructions/llm_design_checklist.md` review on 2026-05-07 for terminology evidence in Stage 3 through Stage 5.
+- This refinement is implemented: Stage 3 can now select terminology-oriented sources, Stage 4 can now extract generic `resolved_terms` evidence, and Stage 5 can now consume that validated terminology evidence without adding acronym-specific fact names.
+- A real end-to-end OpenAI run completed successfully after the terminology refinement was implemented and the remaining Stage 3 and Stage 4 blockers were corrected.
 
 ## Runtime Goal
 
@@ -271,6 +275,8 @@ This is a deliberate design choice. The app could be built with a deterministic 
 
 For `spk_transport_declaration`, the source-selection design should include documentation that covers shipment classification rules whenever the final declaration requires a shipment category. For the current SPK references, this means the selected package should include the source that defines shipment categories, not only route and capacity sources.
 
+When the identified task requires interpreting abbreviations or glossary terms that appear in the declaration format or downstream task contract, the source-selection design should also include terminology sources. For the current SPK references, `zalacznik-G.md` is the obvious terminology source because it contains abbreviation expansions such as `WDP`.
+
 ### Output Schema
 
 ```json
@@ -404,6 +410,18 @@ For `spk_transport_declaration`, Stage 4 should produce an evidence-backed shipm
 - category evidence from the classification rules source
 - confidence and uncertainty notes when the mapping from shipment contents to category is interpretive rather than explicit
 
+For tasks that require interpreting declaration abbreviations or glossary terms, Stage 4 should also produce terminology evidence in a reusable task-scoped form. This refinement is intentionally broader than `WDP` alone: the app should resolve only the abbreviations relevant to the current task, not assume that every command needs every glossary entry.
+
+The implemented Stage 4 representation for this terminology evidence is a fact such as:
+
+- `resolved_terms` with `value` as a list of strings formatted like `TERM = expansion`
+
+For the current SPK references, one possible entry would be:
+
+- `WDP = Wagony Dodatkowe Płatne (dołączane do standardowego składu)`
+
+This keeps the schema generic enough to support future task-relevant abbreviations without introducing one hard-coded fact name per acronym.
+
 This refinement follows `_agent/references/L1_task_decomposition_and_pipeline_design.md` and `_agent/references/L1_structured_outputs_and_validation.md`: the interpretation step belongs in the evidence-producing stage, and downstream code should consume only validated structured output.
 
 ### Boundaries
@@ -435,6 +453,8 @@ Deterministic validation must confirm:
 - the app stops when missing evidence blocks safe execution.
 
 For `spk_transport_declaration`, this means shipment category evidence must be present or explicitly reported missing before Stage 5 may build the declaration result.
+
+For a task that depends on output terminology, this also means the required terminology evidence must be present or explicitly reported missing before Stage 5 may rely on the meaning of the corresponding output field.
 
 ### Artifacts
 
@@ -515,6 +535,10 @@ Stage 5 should keep deterministic code responsible for:
 
 Shipment category assignment for `spk_transport_declaration` does not live in Stage 5 hard-coded keyword-matching code. Category interpretation now belongs to Stage 4 as a validated evidence-backed fact, with Stage 5 limited to consuming that fact.
 
+Likewise, Stage 5 should not infer declaration terminology from local assumptions when that terminology is relevant to the task contract. If a field meaning depends on glossary evidence, Stage 5 should consume the validated terminology evidence produced earlier in the workflow.
+
+For the current SPK declaration task, this means the executor continues to calculate the numeric `wdp` value deterministically and now links that result field to both wagon-capacity evidence and terminology evidence such as `resolved_terms` when the declaration output uses the abbreviation.
+
 Stage 5 must not:
 
 - read new documentation directly,
@@ -536,6 +560,14 @@ Deterministic validation must confirm:
 - uncertainty is preserved.
 
 For `spk_transport_declaration`, the validator should treat shipment category as an evidence-required field rather than a locally hard-coded executor detail.
+
+For terminology-dependent fields, the validator should also treat the corresponding terminology evidence as part of the task evidence contract rather than as an implicit assumption inside the executor.
+
+For the implemented terminology refinement, this means deterministic validation should confirm that:
+
+- `resolved_terms` is present or explicitly reported missing when terminology evidence is required for the task,
+- each retained terminology entry follows the `TERM = expansion` shape,
+- the executor does not rely on undeclared abbreviation meaning when the task contract depends on that meaning.
 
 If no executor is registered for the identified `task_name`, the app must fail with a clear unsupported-task error before task execution. The model must not invent a fallback executor, unsupported result shape, or synthetic final answer for an unsupported task.
 
@@ -710,6 +742,7 @@ The table below records passed reviews only.
 |---|---|---|---|---|
 | 2026-05-06 | MVP2 full workflow | `_agent/instructions/llm_design_checklist.md` | PASS | Implement the full MVP2 workflow described in this README; material LLM design changes require a new review. |
 | 2026-05-07 | Shipment category refinement for `spk_transport_declaration` in Stage 3 through Stage 5 | `_agent/instructions/llm_design_checklist.md` | PASS | Implement only the shipment-category refinement described in this README: include classification-rule source selection, Stage 4 evidence-backed `shipment_category`, and Stage 5 consumption of validated category evidence. |
+| 2026-05-07 | Terminology evidence refinement for declaration abbreviations in Stage 3 through Stage 5 | `_agent/instructions/llm_design_checklist.md` | PASS | Implement only the terminology-evidence refinement described in this README: allow terminology-oriented source selection, extract generic `resolved_terms` evidence, and let Stage 5 consume that evidence without hard-coding acronym-specific facts. |
 
 ## Configuration
 
@@ -820,11 +853,19 @@ With the current implementation, the simplest verification is:
 7. For the implemented shipment-category refinement, confirm the Stage 5 executor consumes validated category evidence instead of classifying the shipment with a hard-coded keyword rule.
 8. Confirm `run_report.md` explains task identity, selected sources, extracted evidence, task result, uncertainty, and validation results.
 9. Confirm unsupported `task_name` values fail before downstream execution with a clear task-registry error.
+10. For the implemented terminology refinement, confirm terminology-dependent fields can be linked to a generic `resolved_terms` evidence fact instead of a one-off acronym-specific fact name.
 
 The current repository state includes a successful real-model run for the supported task:
 
 - `evidence_package.json` includes validated `shipment_category` and `system_funded_categories` evidence
 - `task_result.json` links `category` to `shipment_category`
 - `run_report.md` records a complete Stage 1-5 audit trail
+
+The current repository state also includes a successful real-model verification of the terminology refinement:
+
+- Stage 3 can select a source with `documentation_need` equal to `declaration terminology`
+- Stage 4 can validate a generic `resolved_terms` fact shaped as `TERM = expansion`
+- `task_result.json` can link `wdp` to both wagon-capacity facts and `resolved_terms`
+- `run_report.md` confirms that the real OpenAI-powered run passed Stage 3, Stage 4, and Stage 5 validation with terminology evidence enabled
 
 For later stages, keep the design sections in this README as the source of truth until implementation is added.

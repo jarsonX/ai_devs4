@@ -1,6 +1,7 @@
 # AI-backed Stage 3 source selection for the L4 sendit MVP2 workflow.
 
 import json
+import re
 from typing import Any
 
 from openai import OpenAI
@@ -23,7 +24,7 @@ from src.apps.L4_sendit.L4_sendit_MVP2.validator import (
 SOURCE_SELECTION_INSTRUCTIONS = """\
 You select only the local reference files needed for the already identified task.
 Choose only from the provided inventory paths.
-Use documentation_need values exactly as they appear in task_understanding.documentation_needs.
+Use documentation_need values from task_understanding.documentation_needs or the supported task documentation_need_names.
 Do not merge multiple documentation_need names into one string.
 Do not invent paths, new files, final task answers, or extracted facts from document contents.
 Preserve missing sources and uncertainty when the inventory is insufficient.
@@ -45,7 +46,7 @@ def select_sources_with_ai(
     response = client.responses.create(
         model=model_config.source_selection_model,
         instructions=SOURCE_SELECTION_INSTRUCTIONS,
-        input=_build_source_selection_input(task_understanding, reference_inventory),
+        input=_build_source_selection_input(task_understanding, reference_inventory, supported_tasks),
         text={
             "format": {
                 "type": "json_schema",
@@ -107,9 +108,15 @@ def load_mock_source_selection_response(raw_json_text: str) -> dict[str, Any]:
 def _build_source_selection_input(
     task_understanding: TaskUnderstanding,
     reference_inventory: list[ReferenceInventoryItem],
+    supported_tasks: dict[str, SupportedTaskDefinition],
 ) -> str:
+    task_definition = supported_tasks.get(task_understanding.task_name)
     context = {
         "task_understanding": task_understanding.model_dump(mode="json"),
+        "supported_task_definition": None if task_definition is None else {
+            "task_name": task_definition.task_name,
+            "documentation_need_names": list(task_definition.documentation_need_names),
+        },
         "reference_inventory": [inventory_item.model_dump(mode="json") for inventory_item in reference_inventory],
     }
 
@@ -117,8 +124,9 @@ def _build_source_selection_input(
         [
             "Choose the local reference files needed for this already identified task.",
             "Use only the exact inventory paths.",
-            "For each selected source, documentation_need must exactly match one task_understanding.documentation_needs entry.",
+            "For each selected source, documentation_need must exactly match either one task_understanding.documentation_needs entry or one supported_task_definition.documentation_need_names entry.",
             "Do not concatenate or rewrite documentation_need names.",
+            "If a source is clearly about abbreviations, glossary entries, or terminology, use `declaration terminology` for that source when the supported task allows it.",
             "Do not extract facts from file contents in this step.",
             "",
             json.dumps(context, ensure_ascii=False, indent=2),
@@ -134,6 +142,7 @@ def _build_result(
     supported_tasks: dict[str, SupportedTaskDefinition],
     raw_model_response: dict[str, Any],
 ) -> SourceSelectionResult:
+    _repair_selected_documentation_needs(selected_sources, task_understanding, reference_inventory, supported_tasks)
     validation_results = validate_selected_sources(
         selected_sources=selected_sources,
         task_understanding=task_understanding,
@@ -146,6 +155,55 @@ def _build_result(
         selected_sources=selected_sources,
         raw_model_response=raw_model_response,
     )
+
+
+# Repair documentation_need when a selected source is clearly terminology-oriented.
+def _repair_selected_documentation_needs(
+    selected_sources: SelectedSources,
+    task_understanding: TaskUnderstanding,
+    reference_inventory: list[ReferenceInventoryItem],
+    supported_tasks: dict[str, SupportedTaskDefinition],
+) -> None:
+    task_definition = supported_tasks.get(task_understanding.task_name)
+    if task_definition is None or "declaration terminology" not in task_definition.documentation_need_names:
+        return
+
+    inventory_by_path = {inventory_item.path: inventory_item for inventory_item in reference_inventory}
+    for selected_source in selected_sources.selected_sources:
+        if selected_source.documentation_need == "declaration terminology":
+            continue
+
+        inventory_item = inventory_by_path.get(selected_source.path)
+        if inventory_item is None:
+            continue
+
+        if _looks_like_terminology_source(
+            path=selected_source.path,
+            hint=inventory_item.hint,
+            reason=selected_source.reason,
+            intended_use=selected_source.intended_use,
+        ):
+            selected_source.documentation_need = "declaration terminology"
+
+
+# Detect whether one selected source is clearly intended for abbreviation or glossary lookup.
+def _looks_like_terminology_source(
+    path: str,
+    hint: str,
+    reason: str,
+    intended_use: str,
+) -> bool:
+    combined_text = " ".join((path, hint, reason, intended_use)).lower()
+    terminology_markers = {
+        "abbreviation",
+        "abbreviations",
+        "glossary",
+        "terminology",
+        "skrót",
+        "skróty",
+    }
+    tokens = set(re.findall(r"[0-9A-Za-z_]+", combined_text))
+    return any(marker in combined_text for marker in terminology_markers) or bool(tokens & terminology_markers)
 
 
 # Accept either a raw schema object or a wrapper with selected_sources.

@@ -19,6 +19,7 @@ def build_declaration_task_result(
 ) -> TaskResult:
     route_code = _require_text_fact(evidence_package, "route_code")
     category, category_fact = _require_text_fact_with_context(evidence_package, "shipment_category")
+    resolved_terms = _require_text_list_fact(evidence_package, "resolved_terms")
     system_funded_categories = _normalize_category_symbols(
         _require_text_list_fact(evidence_package, "system_funded_categories")
     )
@@ -29,6 +30,8 @@ def build_declaration_task_result(
         raise ValueError(
             "Known declaration executor does not yet support non-funded category pricing paths."
         )
+    if not _term_list_contains_prefix(resolved_terms, "WDP"):
+        raise ValueError("Known declaration executor requires resolved_terms evidence for WDP.")
 
     additional_wagons = _calculate_physical_additional_wagons(
         shipment_weight_kg=task_understanding.provided_inputs.weight_kg,
@@ -42,12 +45,6 @@ def build_declaration_task_result(
         uncertainty_notes.append(
             f"Shipment category evidence confidence is {category_fact.confidence:.2f} for fact shipment_category."
         )
-    uncertainty_notes.append(
-        (
-            "WDP currently uses the physical additional wagon count for the known task. "
-            "Explicit WDP terminology evidence is not yet extracted in Stage 4."
-        )
-    )
 
     return TaskResult(
         task_name=task_understanding.task_name,
@@ -70,6 +67,7 @@ def build_declaration_task_result(
             EvidenceLink(result_field="amount_due_pp", fact_name="system_funded_categories"),
             EvidenceLink(result_field="wdp", fact_name="standard_capacity_kg"),
             EvidenceLink(result_field="wdp", fact_name="additional_wagon_capacity_kg"),
+            EvidenceLink(result_field="wdp", fact_name="resolved_terms"),
         ],
         uncertainty_notes=uncertainty_notes,
     )
@@ -156,3 +154,9 @@ def _normalize_category_symbols(category_values: list[str]) -> list[str]:
 # Normalize one category evidence value such as "A - Strategiczna" into "A".
 def _normalize_category_symbol(category_value: str) -> str:
     return category_value.split(" ", 1)[0].strip()
+
+
+# Check whether one resolved-terms fact contains a required term prefix such as WDP.
+def _term_list_contains_prefix(term_entries: list[str], term_name: str) -> bool:
+    normalized_prefix = f"{term_name.strip().upper()} ="
+    return any(term_entry.strip().upper().startswith(normalized_prefix) for term_entry in term_entries)

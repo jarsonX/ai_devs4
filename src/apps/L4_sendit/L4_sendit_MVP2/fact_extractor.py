@@ -40,6 +40,7 @@ If a required fact target is not supported by the provided sources, add it to mi
 When `shipment_category` is required, classify the shipment from `task_understanding.provided_inputs.contents`
 against the provided category rules source and return only the category symbol such as `A`, `B`, `C`, `D`, `E`, or `X`.
 Preserve confidence and uncertainty when the category mapping is interpretive rather than explicit.
+When `resolved_terms` is required, return only task-relevant terminology entries in the form `TERM = expansion`.
 Return only JSON matching the requested schema.
 """
 
@@ -64,6 +65,7 @@ class _LoadedSource:
 KNOWN_TASK_FACT_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
     "spk_transport_declaration": {
         "declaration format": ("declaration_template_fields",),
+        "declaration terminology": ("resolved_terms",),
         "route availability and route code": ("route_code", "route_status"),
         "category rules": ("shipment_category", "disabled_route_exception"),
         "payment rules": ("system_funded_categories",),
@@ -372,6 +374,14 @@ def _build_task_specific_extraction_guidance(evidence_context: EvidenceContext) 
                 "Return the category symbol only in fact.value and explain uncertainty in uncertainty_notes when needed.",
             ]
         )
+    if "resolved_terms" in evidence_context.required_fact_targets:
+        guidance_lines.extend(
+            [
+                "For resolved_terms, include only abbreviations or glossary terms that are relevant to the current task output.",
+                "Return resolved_terms as a list of strings formatted exactly like `TERM = expansion`.",
+                "Do not dump the full glossary when only a subset is relevant to the current task.",
+            ]
+        )
 
     return guidance_lines
 
@@ -438,7 +448,8 @@ def _repair_markdown_evidence_quotes(
 
 # Find one source line that most likely matches the fact when the quote is slightly paraphrased.
 def _find_best_quote_line(fact: EvidenceFact, source_text: str) -> str | None:
-    candidate_lines = [line.strip() for line in source_text.splitlines() if line.strip()]
+    raw_lines = source_text.splitlines()
+    candidate_lines = [line for line in raw_lines if line.strip()]
     if not candidate_lines:
         return None
 
@@ -446,26 +457,74 @@ def _find_best_quote_line(fact: EvidenceFact, source_text: str) -> str | None:
     if not query_tokens:
         return None
 
-    scored_candidates: list[tuple[int, str]] = []
-    for candidate_line in candidate_lines:
+    scored_candidates: list[tuple[int, int, str]] = []
+    for line_index, candidate_line in enumerate(raw_lines):
+        if not candidate_line.strip():
+            continue
         candidate_tokens = set(_tokenize_for_quote_repair(candidate_line))
         score = sum(1 for token in query_tokens if token in candidate_tokens)
         if score > 0:
-            scored_candidates.append((score, candidate_line))
+            scored_candidates.append((line_index, score, candidate_line))
 
     if not scored_candidates:
         return None
 
-    scored_candidates.sort(key=lambda item: item[0], reverse=True)
-    best_score, best_line = scored_candidates[0]
-    second_best_score = scored_candidates[1][0] if len(scored_candidates) > 1 else 0
+    scored_candidates.sort(key=lambda item: item[1], reverse=True)
+    best_index, best_score, best_line = scored_candidates[0]
+    second_best_score = scored_candidates[1][1] if len(scored_candidates) > 1 else 0
 
     if best_score < 3:
         return None
-    if best_score == second_best_score:
+    if best_score > second_best_score:
+        return best_line.strip()
+
+    repaired_span = _find_best_quote_span(raw_lines, scored_candidates, best_score)
+    if repaired_span is not None:
+        return repaired_span
+
+    return raw_lines[best_index].strip()
+
+
+# Join a short contiguous source span when one fact maps to several equally relevant lines.
+def _find_best_quote_span(
+    raw_lines: list[str],
+    scored_candidates: list[tuple[int, int, str]],
+    best_score: int,
+) -> str | None:
+    strong_indexes = [
+        line_index
+        for line_index, score, _candidate_line in scored_candidates
+        if score >= max(2, best_score - 1)
+    ]
+    if not strong_indexes:
         return None
 
-    return best_line.removeprefix("- ").strip()
+    grouped_indexes: list[list[int]] = []
+    current_group: list[int] = [strong_indexes[0]]
+    for line_index in strong_indexes[1:]:
+        if line_index == current_group[-1] + 1:
+            current_group.append(line_index)
+            continue
+
+        grouped_indexes.append(current_group)
+        current_group = [line_index]
+    grouped_indexes.append(current_group)
+
+    scored_groups: list[tuple[int, int, int, int]] = []
+    score_by_index = {line_index: score for line_index, score, _candidate_line in scored_candidates}
+    for group in grouped_indexes:
+        start_index = group[0]
+        end_index = group[-1]
+        group_score = sum(score_by_index.get(line_index, 0) for line_index in group)
+        scored_groups.append((group_score, len(group), start_index, end_index))
+
+    scored_groups.sort(key=lambda item: (item[0], -item[1], -item[2]), reverse=True)
+    _group_score, group_length, start_index, end_index = scored_groups[0]
+    if group_length <= 1:
+        return None
+
+    quote_lines = raw_lines[start_index : end_index + 1]
+    return "\n".join(quote_lines).strip()
 
 
 # Build search tokens from the model-produced fact for deterministic quote repair.

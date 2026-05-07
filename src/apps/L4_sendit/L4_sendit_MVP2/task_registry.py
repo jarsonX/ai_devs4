@@ -26,6 +26,7 @@ SUPPORTED_TASKS: tuple[SupportedTaskDefinition, ...] = (
         ),
         documentation_need_names=(
             "declaration format",
+            "declaration terminology",
             "route availability and route code",
             "category rules",
             "payment rules",

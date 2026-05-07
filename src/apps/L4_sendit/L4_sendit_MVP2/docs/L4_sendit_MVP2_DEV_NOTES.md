@@ -12,7 +12,7 @@
 | Issue | Status |
 |---|---|
 | `declaration_builder` | <span style="color: #15803d;"><strong>Resolved</strong></span> |
-| `WDP` | <span style="color: #b45309;"><strong>Not resolved</strong></span> |
+| `WDP` | <span style="color: #15803d;"><strong>Resolved</strong></span> |
 
 ## Issue 1: declaration_builder
 ***Status:*** <span style="color: #15803d;"><strong>Resolved</strong></span>
@@ -63,7 +63,7 @@ This rule assigned category `A` based on local string matching in the executor. 
 
 ### Root cause
 
-- The issue was detected by the user during manual verification of AI-generated code.
+- The issue was detected by the developer during manual verification of AI-generated code.
 - The code was proposed by an AI agent (AI responsibility).
 - The earlier app design did not define clearly enough that shipment classification should be extracted before task execution (human responsibility).
 
@@ -92,24 +92,76 @@ This rule assigned category `A` based on local string matching in the executor. 
 - In a production application, category-A assignment should likely require a human approval step or an additional business-side safeguard.
 
 ## Issue 2: WDP
-***Status:*** <span style="color: #b45309;"><strong>Not resolved</strong></span>
+***Status:*** <span style="color: #15803d;"><strong>Resolved</strong></span>
 
-According to `data/L4_sendit/output/task_result.json`, the current implementation still reports:
+### Original problem
 
-```text
-WDP currently uses the physical additional wagon count for the known task.
-Explicit WDP terminology evidence is not yet extracted in Stage 4.
-```
+`wdp` was already calculated correctly as the physical number of additional wagons, but the result field still lacked explicit terminology evidence showing what the declaration abbreviation meant.
 
-WDP seems to be calculated correctly. However, it should still be verified how the model handles the `WDP` abbreviation, which according to `zalacznik-G.md` stands for `Wagony Dodatkowe Płatne`.
+That gap mattered because:
 
-At the moment, this does not block the supported task flow, but it remains the main known refinement area in Stage 4 and Stage 5.
+- the output field used an SPK abbreviation rather than a self-explanatory long name,
+- the executor depended on implicit developer knowledge that `WDP` meant `Wagony Dodatkowe Płatne`,
+- the evidence trail was weaker than it should be for a format-sensitive declaration output.
+
+### Proposed solution
+
+- Do not add a WDP-only fact such as `wdp_term_meaning`.
+- Treat this as a broader terminology problem, not as a single abbreviation exception.
+- Add a new documentation-need concept such as `declaration terminology` or equivalent terminology/glossary need when the identified task requires interpreting abbreviations used in the output contract or reference package.
+- In Stage 3, allow source selection to include glossary or abbreviation sources such as `zalacznik-G.md` when the current task requires terminology resolution.
+- In Stage 4, extract terminology evidence in a reusable form for task-relevant terms rather than hard-coding `WDP` as a one-off case.
+- In Stage 5, keep `wdp` calculation deterministic exactly as it is now, but allow the result to link not only to capacity facts but also to the terminology evidence that explains what the output field means.
+
+### Design rationale
+
+- A WDP-specific fact would overfit the workflow to one declaration field and one known command shape.
+- The application should not assume that every supported command requires WDP.
+- The same design gap can appear for other abbreviations in SPK documentation and declaration fields, so the solution should generalize to task-relevant terminology.
+- This keeps the app aligned with the command-driven design: only tasks that actually require terminology resolution should trigger that part of the documentation workflow.
+
+### Implemented solution
+
+- Stage 3 now supports a terminology-oriented documentation need for tasks that require abbreviation resolution in the output contract.
+- Stage 3 source selection can now include terminology sources such as `zalacznik-G.md` without introducing a `WDP`-specific source type or fact name.
+- Stage 4 now extracts a generic `resolved_terms` fact whose `value` contains task-relevant entries shaped as `TERM = expansion`.
+- Stage 5 still calculates `wdp` deterministically from validated wagon-capacity evidence, but it now also requires terminology evidence and links `wdp` to `resolved_terms`.
+- The validator now treats terminology evidence as part of the evidence contract for terminology-dependent outputs.
+
+### Implementation notes
+
+- `task_registry.py` now declares `declaration terminology` as a documentation need for the known declaration task.
+- `source_selector.py` now allows Stage 3 to satisfy task needs from both Stage 1 documentation needs and task-supported documentation needs, which is how terminology sources can be selected when the task requires them.
+- `fact_extractor.py` now supports `resolved_terms` and instructs Stage 4 to extract only task-relevant terminology entries instead of a full glossary dump.
+- `declaration_builder.py` still computes `wdp` with deterministic arithmetic, but now requires `resolved_terms` evidence that includes `WDP`.
+- `validator.py` now validates the `resolved_terms` shape, source provenance, and required terminology presence for the known declaration task.
+
+### Verification
+
+- Local deterministic verification passed after the refinement was implemented.
+- The mock-driven Stage 3 and Stage 4 flow can now carry `declaration terminology` and validated `resolved_terms` evidence.
+- The resulting `task_result.json` can link `wdp` to `standard_capacity_kg`, `additional_wagon_capacity_kg`, and `resolved_terms`.
+- A real OpenAI-powered end-to-end run completed successfully after the remaining Stage 3 and Stage 4 blockers were corrected.
+- The resulting `selected_sources.json` now assigns `zalacznik-G.md` to `declaration terminology`.
+- The resulting `evidence_package.json` now contains validated `resolved_terms` evidence and literal markdown quotes accepted by the deterministic validator.
+
+### Remaining caveat
+
+- The terminology refinement is now confirmed by a real OpenAI-powered run, but shipment category assignment still remains interpretive rather than explicit for the current cargo wording.
+
+### Follow-up fix
+
+- The first real OpenAI-powered run after the terminology refinement exposed two non-input blockers:
+- Stage 4 accepted semantically correct facts, but the model returned two markdown `evidence_quote` values in a form that deterministic quote validation could not accept.
+- Stage 3 selected `zalacznik-G.md`, but did not initially assign the `declaration terminology` documentation need.
+- `fact_extractor.py` was then updated so markdown quote repair can recover short contiguous multi-line spans when one fact is supported by more than one adjacent line.
+- `source_selector.py` was then updated with stricter terminology guidance and a lightweight deterministic correction for clearly terminology-oriented sources.
 
 ## Thoughts After Stage 5 Implementation
 
 Stage 5 works for the current task, and the `declaration_builder` issue is now closed:
 
 - Category A is no longer assigned inside the known task executor; it is extracted in Stage 4 as `shipment_category`.
-- WDP still uses the physical number of additional wagons, without a separate terminological fact extracted in Stage 4.
+- WDP still uses the physical number of additional wagons, but it is now paired with generic terminology evidence extracted in Stage 4 as `resolved_terms`.
 
-This means the pipeline already works through Stage 5 for the supported task, and WDP remains the primary known refinement area before Stage 6.
+This means the pipeline already works through Stage 5 for the supported task, and the main known work now shifts from Stage 5 evidence semantics to the still-design-only Stage 6 and Stage 7.

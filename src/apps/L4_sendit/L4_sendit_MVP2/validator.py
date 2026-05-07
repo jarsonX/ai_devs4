@@ -157,6 +157,7 @@ def validate_evidence_package(
     results.extend(_validate_image_evidence_details(evidence_package))
     results.extend(_validate_source_coverage(evidence_package, selected_sources_by_path))
     results.extend(_validate_required_fact_targets(evidence_package, evidence_context))
+    results.extend(_validate_resolved_terms_fact(evidence_package, selected_sources))
     results.extend(_validate_known_task_category_fact(evidence_package, task_understanding, selected_sources))
     results.extend(_validate_evidence_conflicts_and_missing(evidence_package))
 
@@ -779,6 +780,58 @@ def _validate_required_fact_targets(
     return [ValidationResult(status="OK", message="required fact targets are extracted or reported missing")]
 
 
+# Validate generic terminology evidence entries for tasks that use resolved terms.
+def _validate_resolved_terms_fact(
+    evidence_package: EvidencePackage,
+    selected_sources: SelectedSources,
+) -> list[ValidationResult]:
+    resolved_terms_fact = _find_fact_by_name(evidence_package, "resolved_terms")
+    if resolved_terms_fact is None:
+        return [ValidationResult(status="OK", message="resolved_terms fact is absent")]
+
+    if not isinstance(resolved_terms_fact.value, list) or not all(
+        isinstance(item, str) for item in resolved_terms_fact.value
+    ):
+        return [
+            ValidationResult(
+                status="ERROR",
+                message="resolved_terms fact must be a list of strings",
+            )
+        ]
+
+    invalid_entries = [
+        item
+        for item in resolved_terms_fact.value
+        if " = " not in item
+        or not item.split(" = ", 1)[0].strip()
+        or not item.split(" = ", 1)[1].strip()
+    ]
+    if invalid_entries:
+        return [
+            ValidationResult(
+                status="ERROR",
+                message=f"resolved_terms entries must use `TERM = expansion` format: {', '.join(invalid_entries)}",
+            )
+        ]
+
+    matching_sources = [
+        selected_source
+        for selected_source in selected_sources.selected_sources
+        if selected_source.path == resolved_terms_fact.source_path
+    ]
+    if matching_sources and not any(
+        source.documentation_need == "declaration terminology" for source in matching_sources
+    ):
+        return [
+            ValidationResult(
+                status="ERROR",
+                message="resolved_terms fact must come from a source selected for declaration terminology",
+            )
+        ]
+
+    return [ValidationResult(status="OK", message="resolved_terms fact is valid")]
+
+
 # Validate the known-task shipment category fact shape and source scope.
 def _validate_known_task_category_fact(
     evidence_package: EvidencePackage,
@@ -946,6 +999,7 @@ def _validate_known_task_result_math(
     standard_capacity_kg = _find_required_int_fact(evidence_package, "standard_capacity_kg")
     additional_wagon_capacity_kg = _find_required_int_fact(evidence_package, "additional_wagon_capacity_kg")
     shipment_category = _normalize_category_symbol(_find_required_text_fact(evidence_package, "shipment_category"))
+    resolved_terms = _find_required_text_list_fact(evidence_package, "resolved_terms")
     system_funded_categories = _normalize_category_symbols(
         _find_required_text_list_fact(evidence_package, "system_funded_categories")
     )
@@ -960,6 +1014,16 @@ def _validate_known_task_result_math(
         results.append(ValidationResult(status="OK", message="task_result wdp matches deterministic wagon math"))
     else:
         results.append(ValidationResult(status="ERROR", message="task_result wdp does not match deterministic wagon math"))
+
+    if _term_list_contains_prefix(resolved_terms, "WDP"):
+        results.append(ValidationResult(status="OK", message="task_result wdp terminology is backed by resolved_terms"))
+    else:
+        results.append(
+            ValidationResult(
+                status="ERROR",
+                message="task_result wdp is missing required WDP terminology evidence in resolved_terms",
+            )
+        )
 
     if task_result.result.category == shipment_category:
         results.append(ValidationResult(status="OK", message="task_result category matches shipment_category evidence"))
@@ -1083,3 +1147,9 @@ def _normalize_category_symbols(category_values: list[str]) -> list[str]:
 # Normalize one category evidence value such as "A - Strategiczna" into "A".
 def _normalize_category_symbol(category_value: str) -> str:
     return category_value.split(" ", 1)[0].strip()
+
+
+# Check whether one resolved-terms fact contains a required term prefix such as WDP.
+def _term_list_contains_prefix(term_entries: list[str], term_name: str) -> bool:
+    normalized_prefix = f"{term_name.strip().upper()} ="
+    return any(term_entry.strip().upper().startswith(normalized_prefix) for term_entry in term_entries)
