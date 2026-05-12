@@ -2,10 +2,16 @@
 
 Use this checklist to review a completed LLM application and decide whether it is well optimized.
 
+Choose one review mode before answering the checklist:
+- `production` for user-facing, persistent, deployed, long-running, or reliability-sensitive applications,
+- `non-production` for local exercises, prototypes, one-off scripts, and learning workflows where production runtime guarantees are intentionally out of scope.
+
 Mark each item as:
 - `YES` if the rule is clearly satisfied,
 - `NO` if it is missing,
 - `N/A` if this checklist item does not apply to the current application under review.
+
+Items marked `Production-only` must be reviewed in `production` mode. In `non-production` mode, mark them `N/A` with a short note unless the completed application still includes production-like runtime behavior.
 
 For every item, add a short evidence note:
 - mention the file, component, workflow step, metric, or behavior that supports the answer,
@@ -60,22 +66,36 @@ For every item, add a short evidence note:
 - [ ] The number of LLM calls is intentionally minimized.
 - [ ] The number of tool calls is intentionally minimized.
 - [ ] Large prompts are avoided because they increase token usage, latency, and noise.
+- [ ] Model output length is intentionally controlled to avoid unnecessary tokens, latency, and downstream noise.
 - [ ] The app has clear places where cost, latency, retries, or token usage can be measured or logged.
 - [ ] Expensive steps are easy to identify during debugging or review.
 
-## 8. Safety And Control
+## 8. Production Runtime Performance And Task Lifecycle
+
+- [ ] Production-only: Long-running LLM, tool, media generation, or agent tasks report progress or heartbeat state while work is running.
+- [ ] Production-only: The user can understand what is happening while waiting for slow model, tool, media generation, or agent work.
+- [ ] Production-only: The user can inspect partial or final artifacts during long-running work when the workflow supports it.
+- [ ] Production-only: Long-running work can continue safely if the user closes the browser, loses connection, or leaves the application.
+- [ ] Production-only: Task state, intermediate outputs, final results, and retry state are persisted where repeated work would be costly or fragile.
+- [ ] Production-only: Tasks can be paused and resumed after errors, user approval waits, tool results, retries, or agent completion.
+- [ ] Production-only: User interaction during long-running work is supported where relevant, such as message queueing, cancellation, or opening a separate thread.
+- [ ] Production-only: UI state is not tightly coupled to backend execution state for long-running tasks.
+- [ ] Production-only: Event-driven or job-based orchestration is used or explicitly justified where a synchronous request/response flow would be fragile.
+
+## 9. Safety And Control
 
 - [ ] The model is responsible for interpretation and planning, not final authorization.
 - [ ] Sensitive or risky actions are protected by backend checks, not by model judgment alone.
 - [ ] Retrieved or user-provided content is not mixed with system instructions in an unsafe way.
 - [ ] The workflow stops or asks for missing required inputs instead of guessing important values.
 
-## 9. Review Validation
+## 10. Review Validation
 
 - [ ] There is no obvious LLM call that can be replaced with ordinary code without reducing required quality.
 - [ ] There is no obvious workflow step that can be removed without changing the result or reducing reliability.
 - [ ] There is no obvious context block that can be removed without making the current step weaker or less safe.
 - [ ] The current workflow would still be understandable and maintainable if the application becomes larger.
+- [ ] Production-only: Long-running production work would remain understandable, resumable, and debuggable when multiple tasks are active at once.
 
 ## Quick Rule Of Thumb
 
@@ -84,11 +104,15 @@ Prefer:
 - fewer calls,
 - shorter workflows,
 - stronger validation,
-- simpler responsibilities per step.
+- simpler responsibilities per step,
+- visible progress for long-running production work,
+- resumable job state for production workflows.
 
 Avoid:
 - one huge prompt for everything,
 - passing full history by default,
 - exposing all tools all the time,
 - repeating the same calls without caching or batching,
-- using the model where normal code is enough.
+- using the model where normal code is enough,
+- tying production task execution directly to UI session state,
+- forcing long-running production work into fragile synchronous flows.
