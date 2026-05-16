@@ -87,10 +87,17 @@ DEV_NOTES should not duplicate README. If a note describes the current app contr
 ## Agent References
 
 - Agent reference files are curated operational notes derived from course learning material and adapted for agent use.
-- Use `_agent/references/INDEX.md` first to find the best 1-3 relevant agent reference files.
-- Open more reference files only when needed for implementation, explanation, or a design decision.
+- Use `_agent/references/INDEX.md` as the lightweight reference map for `_agent/references/`.
+- Treat the index as a router; agent reference files are the source of truth for detailed guidance.
+- Start from the index to find the most relevant agent reference file(s).
+- Start with the smallest useful set of reference files, usually 1-3.
+- Open additional related reference files only when the task spans multiple concepts, when selected files point to prerequisites or follow-up topics, or when the first pass leaves uncertainty.
+- Prefer incremental loading over opening all files from the same reference group by default, for example all `L2.*` entries.
 - Align solutions, vocabulary, and explanations with the reference files when it improves learning and clarity.
 - Mention reference files only when they actually influenced the solution; explain any meaningful deviation and its trade-off.
+- If no reference file clearly matches, say so explicitly instead of forcing a match.
+- When updating `_agent/references/INDEX.md`, keep each row short and scannable, use 3-7 keywords per reference file, describe concrete task situations in `Use when`, and link only meaningfully overlapping files in `Related references`.
+- Update `_agent/references/INDEX.md` whenever an agent reference file is added, removed, renamed, or substantially rescoped.
 
 ## LLM Design Gate
 
