@@ -3,6 +3,7 @@ _agent/references/
 data/
 venv/
 .env
+tests/
 __pycache__/
 *.pyc
 TROUBLESHOOTING.md
