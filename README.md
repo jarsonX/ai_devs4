@@ -9,10 +9,12 @@ This repository is both a learning workspace and a portfolio of applied AI engin
 - [About the course](#about-the-course)
 - [Repository structure](#repository-structure)
 - [Learning approach](#learning-approach)
+  - [Human-AI collaboration](#human-ai-collaboration)
+  - [Agent knowledge base availability](#agent-knowledge-base-availability)
 - [What this repository demonstrates](#what-this-repository-demonstrates)
 - [Disclaimers](#disclaimers)
-  - [Course & Content](#course-content)
-  - [AI Usage](#ai-usage)
+  - [Course & Content](#course--content)
+  - [AI Usage Note](#ai-usage-note)
 
 ## About the course
 
@@ -33,11 +35,25 @@ Runtime data, generated outputs, logs, cache files, downloaded references, and s
 
 ## Learning approach
 
-The work in this repository follows an author-directed human-AI collaboration model. The author acts as the architect, reviewer, orchestrator, and learner, while AI coding agents support implementation, refactoring, debugging, and documentation.
+### Human-AI collaboration
 
-This is intentionally different from treating an agent as a black-box task solver. For all applications, the workflow includes explicit design discussion, architecture decisions, documentation planning, implementation review, manual code reading, debugging, and follow-up refinement. The goal is to understand the produced code and the design trade-offs behind it, even when the first implementation draft is generated with AI assistance.
+This project was developed with the assistance of **OpenAI Codex** as a pair-programming assistant and coding agent. AI supported idea exploration, problem-solving, implementation, refactoring, debugging, review work, and documentation support.
 
-The repository therefore documents not only final code, but also a way of working: using AI as an engineering partner while preserving human responsibility for direction, validation, learning, and quality. This is not presented only as a claim. In some places, the repository also includes concrete evidence of that workflow, such as [L4_sendit_MVP2_DEV_NOTES.md](src/apps/L4_sendit/L4_sendit_MVP2/docs/L4_sendit_MVP2_DEV_NOTES.md), where AI-generated implementation choices are explicitly reviewed, challenged, and refined from a developer perspective.
+The work follows an author-directed human-AI collaboration model. The author acts as the architect, reviewer, orchestrator, and learner, while AI coding agents support implementation within the direction set by the author and remain subject to author review.
+
+This is intentionally different from treating an agent as a black-box task solver or autonomous creator. For all applications, the workflow includes explicit design discussion, architecture decisions, documentation planning, implementation review, manual code reading, debugging, and follow-up refinement. The goal is to understand the produced code and the design trade-offs behind it, even when the first implementation draft is generated with AI assistance.
+
+The repository therefore documents not only final code, but also a way of working: using AI as an engineering partner while preserving human responsibility for direction, validation, learning, and quality. In some places, the repository also includes concrete evidence of that workflow, such as [L4_sendit_MVP2_DEV_NOTES.md](src/apps/L4_sendit/L4_sendit_MVP2/docs/L4_sendit_MVP2_DEV_NOTES.md), where AI-generated implementation choices are explicitly reviewed, challenged, and refined from a developer perspective.
+
+For transparency and educational value, this repository includes publishable instruction and workflow files used during the human-AI collaboration process while building the applications in this repository, including [AGENTS.md](AGENTS.md) and selected supporting documents in [`_agent/`](_agent/). They are published as real working materials that may help others develop more structured and responsible ways of working with AI tools. Some private agent knowledge base materials are intentionally omitted, as explained below.
+
+### Agent knowledge base availability
+
+Some files used during work with AI coding agents are intentionally **not included in the public repository**. This mainly applies to parts of the agent knowledge base: curated reference notes that were built from course materials and adapted for the author's local agent workflow.
+
+Because those materials are derived from course content, they are also connected to the work and intellectual property of the course authors. To respect their rights, effort, and ownership of the original learning materials, the derived agent knowledge base is kept private even though it may be used locally while developing the repository.
+
+As a result, documentation in this repository may contain references to agent knowledge base materials that are not available in the public version of the repo. Those references are left in place because they document the real working process, but they should be understood as pointers to private local context rather than missing setup steps required to run the applications.
 
 ## What this repository demonstrates
 
@@ -74,16 +90,6 @@ The repository is intended purely for educational and portfolio purposes.
 
 ---
 
-### AI Usage
+### AI Usage Note
 
-This project was developed with the assistance of **OpenAI Codex** as a pair-programming assistant and coding agent.
-
-AI supported idea exploration, problem-solving, implementation, refactoring, debugging, review work, and documentation support.
-
-No application in this repository was produced without substantial human input, review, and decision-making. Key technical and architectural decisions were either made directly by the author or implemented by the agent after the author approved the direction.
-
-The use of AI is part of what this repository is meant to show: not autonomous code generation, but a structured workflow in which the author defines goals, evaluates trade-offs, reviews results, improves quality, and learns from the implementation.
-
-For transparency and educational value, this repository also includes the actual instruction and workflow files used during the human-AI collaboration process while building the applications in this repository, including [AGENTS.md](AGENTS.md) and supporting documents in [`_agent/`](_agent/). They are published as real working materials that may help others develop more structured and responsible ways of working with AI tools.
-
-The AI acted as a tool within an author-directed workflow, not as an autonomous creator.
+Information about AI-assisted development, coding agents, and private agent knowledge base materials is described in [Learning approach](#learning-approach), especially [Human-AI collaboration](#human-ai-collaboration) and [Agent knowledge base availability](#agent-knowledge-base-availability).

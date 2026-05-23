@@ -13,9 +13,10 @@
 - [9. Step D - Write Extract Files](#9-step-d---write-extract-files)
 - [10. Step E - Check Duplicated Information Within The Current Lesson](#10-step-e---check-duplicated-information-within-the-current-lesson)
 - [11. Step F - Update INDEX.md](#11-step-f---update-indexmd)
-- [12. Step G - Check Duplicated Information Across All Lessons](#12-step-g---check-duplicated-information-across-all-lessons)
-- [13. Step H - Final Report](#13-step-h---final-report)
-- [14. General Safety And Behavior Rules](#14-general-safety-and-behavior-rules)
+- [12. Step G - Update GLOSSARY.md](#12-step-g---update-glossarymd)
+- [13. Step H - Check Duplicated Information Across All Lessons](#13-step-h---check-duplicated-information-across-all-lessons)
+- [14. Step I - Final Report](#14-step-i---final-report)
+- [15. General Safety And Behavior Rules](#15-general-safety-and-behavior-rules)
 
 ---
 
@@ -38,19 +39,22 @@ Extract files must be:
 # 2. PATH CONSTANTS
 
 RAW_DIR =
-C:\Users\jaros\OneDrive\_Tech\_git_repos\ai_devs4\_agent\references\raw
+`.\_agent\references\raw`
 
 RAW_IMAGE_DIR =
-C:\Users\jaros\OneDrive\_Tech\_git_repos\ai_devs4\_agent\references\raw\images
+`.\_agent\references\raw\images`
 
 PNG_MAP_FILE_PATTERN =
-C:\Users\jaros\OneDrive\_Tech\_git_repos\ai_devs4\_agent\references\raw\images\L<lesson_number>_png_map.md
+`.\_agent\references\raw\images\L<lesson_number>_png_map.md`
 
 OUTPUT_DIR =
-C:\Users\jaros\OneDrive\_Tech\_git_repos\ai_devs4\_agent\references
+`.\_agent\references`
 
 INDEX_FILE =
-C:\Users\jaros\OneDrive\_Tech\_git_repos\ai_devs4\_agent\references\INDEX.md
+`.\_agent\references\INDEX.md`
+
+GLOSSARY_FILE =
+`.\GLOSSARY.md`
 
 ---
 
@@ -175,6 +179,19 @@ Purpose:
 
 INDEX_FILE must be written in English.
 
+## 3.5. GLOSSARY FILE
+
+GLOSSARY_FILE is the repository-root human-facing glossary.
+
+Purpose:
+- help the human learner understand abbreviations and concepts found in extract files,
+- provide short beginner-friendly explanations,
+- map terms to related extract references.
+
+GLOSSARY_FILE must be written in English.
+
+GLOSSARY_FILE supports learning. It is not the primary operational reference for AI agents.
+
 ---
 
 # 4. WORKING SETS
@@ -211,6 +228,12 @@ Extract files created during the current run.
 EXISTING_EXTRACT_SET:
 Extract files that already existed in OUTPUT_DIR before the current run.
 
+GLOSSARY_CANDIDATE_SET:
+Abbreviations and concepts discovered in NEW_EXTRACT_SET during the current run that may need to be added to GLOSSARY_FILE.
+
+GLOSSARY_EXISTING_TERM_SET:
+Terms already present in the Term column of GLOSSARY_FILE before the current glossary update step.
+
 Working set rules:
 - RAW_INPUT_SET is the only source for creating new extracts.
 - LESSON_SOURCE_SET preserves deterministic numeric order.
@@ -223,6 +246,8 @@ Working set rules:
 - NEW_EXTRACT_SET must be saved in OUTPUT_DIR.
 - EXISTING_EXTRACT_SET may be used for index updates and duplication checks.
 - EXISTING_EXTRACT_SET must not be modified unless the user explicitly approves it.
+- GLOSSARY_CANDIDATE_SET must be derived from NEW_EXTRACT_SET, not from a full glossary rebuild by default.
+- GLOSSARY_EXISTING_TERM_SET should be built by reading only the Term column of GLOSSARY_FILE whenever possible.
 
 ---
 
@@ -272,8 +297,9 @@ Pipeline steps:
 - Step D - Write extract files
 - Step E - Check duplicated information within the current lesson
 - Step F - Update INDEX.md
-- Step G - Check duplicated information across all lessons
-- Step H - Final report
+- Step G - Update GLOSSARY.md
+- Step H - Check duplicated information across all lessons
+- Step I - Final report
 
 The agent must not combine PNG preparation, semantic extract planning, and extract writing in a single main pipeline step.
 
@@ -743,36 +769,108 @@ After INDEX_FILE has been updated, stop and report:
 - new entries added,
 - existing entries changed, if any,
 - inconsistencies noticed but not changed,
-- whether INDEX_FILE suggests overlapping topics relevant to Step G,
+- whether INDEX_FILE suggests overlapping topics relevant to Step H,
 - unprocessed lesson groups remaining, if any.
 
 If unprocessed lesson groups remain, ask whether to proceed to Step B for the next lesson group or move toward final cross-lesson checks.
 
-If INDEX_FILE suggests relevant cross-lesson overlap and the user wants cross-lesson deduplication now, ask for permission to proceed to Step G.
-
-If INDEX_FILE does not suggest relevant cross-lesson overlap, state that Step G can be skipped and ask for permission to proceed directly to Step H.
+Ask for permission to proceed to Step G.
 
 ---
 
-# 12. STEP G - CHECK DUPLICATED INFORMATION ACROSS ALL LESSONS
+# 12. STEP G - UPDATE GLOSSARY.md
 
-## G.1. CONDITIONAL START CONDITION
+## G.1. START CONDITION
 
-Run Step G only if at least one condition is true:
+Start only after Step F has been completed for CURRENT_LESSON_GROUP and the user has approved continuation.
+
+If GLOSSARY_FILE does not exist:
+- create it at repository root,
+- write it as a human-facing Markdown glossary,
+- include a concise Table Of Contents near the beginning when useful for navigation.
+
+## G.2. SCOPE
+
+Update GLOSSARY_FILE from NEW_EXTRACT_SET for CURRENT_LESSON_GROUP only.
+
+GLOSSARY_FILE is intended primarily for the human learner, not as the main operational reference for AI agents.
+
+Do not create temporary checklist files for routine glossary updates unless the user explicitly requests them.
+
+Do not scan all extract files by default. Scan only NEW_EXTRACT_SET unless:
+- the user explicitly requests a full glossary rebuild,
+- the glossary structure is broken,
+- a term conflict cannot be resolved without checking existing references.
+
+## G.3. PROCEDURE
+
+1. Read only the Term column of GLOSSARY_FILE whenever possible to build GLOSSARY_EXISTING_TERM_SET.
+2. Preserve the existing glossary table structure unless it is clearly broken or the user approves restructuring.
+3. Scan each file in NEW_EXTRACT_SET for abbreviations and important concepts.
+4. For each discovered abbreviation or concept:
+   - if the term already exists in GLOSSARY_FILE, do not duplicate the row;
+   - read only the existing row for that term when its Description or Related references must be checked or updated;
+   - add the new extract file to `Related references` if it is not already listed;
+   - if the term is new, add a new row.
+5. Write or update `Description` for each new or materially changed term.
+6. Keep descriptions short: 1-3 beginner-friendly sentences.
+7. For abbreviations, start the description with the expanded form of the abbreviation. The expansion does not count toward the 1-3 sentence limit.
+8. Use language understandable to a beginner in programming and AI.
+9. Avoid unexplained jargon. If a technical word is necessary, explain it simply.
+10. Keep the table sorted alphabetically by the term column.
+11. Keep `Related references` as extract file names in backticks.
+
+## G.4. GLOSSARY STYLE RULES
+
+GLOSSARY_FILE must be:
+- written in English,
+- human-facing,
+- beginner-friendly,
+- concise,
+- accurate to the extract files,
+- useful for learning vocabulary before reading the detailed agent references.
+
+A glossary description should explain what the term means in practice, not only give a formal definition.
+
+Do not use GLOSSARY_FILE to store operational instructions that belong in extract files.
+
+Do not add secrets, real API URLs, credentials, tokens, or internal endpoints.
+
+## G.5. COMPLETION
+
+After GLOSSARY_FILE has been updated, stop and report:
+- new terms added,
+- existing terms updated,
+- related references added to existing terms,
+- terms considered but skipped,
+- uncertainties,
+- whether Step H is recommended or can be skipped.
+
+If INDEX_FILE suggests relevant cross-lesson overlap and the user wants cross-lesson deduplication now, ask for permission to proceed to Step H.
+
+If INDEX_FILE does not suggest relevant cross-lesson overlap, state that Step H can be skipped and ask for permission to proceed directly to Step I.
+
+---
+
+# 13. STEP H - CHECK DUPLICATED INFORMATION ACROSS ALL LESSONS
+
+## H.1. CONDITIONAL START CONDITION
+
+Run Step H only if at least one condition is true:
 1. INDEX_FILE suggests overlapping topics between NEW_EXTRACT_SET and EXISTING_EXTRACT_SET.
 2. The user explicitly requests global cross-lesson deduplication.
 
 If neither condition is met:
-- do not run Step G,
-- report that Step G was skipped,
+- do not run Step H,
+- report that Step H was skipped,
 - explain why,
-- ask for permission to proceed to Step H.
+- ask for permission to proceed to Step I.
 
-Even when Step G conditions are met, start only after:
-- Step F has been completed for the relevant new extract files,
-- the user has explicitly approved continuation to Step G.
+Even when Step H conditions are met, start only after:
+- Step G has been completed for the relevant new extract files,
+- the user has explicitly approved continuation to Step H.
 
-## G.2. SCOPE
+## H.2. SCOPE
 
 Use INDEX_FILE and extract files from:
 - NEW_EXTRACT_SET,
@@ -788,7 +886,7 @@ Do not inspect all existing extract files unless the user explicitly requests gl
 
 Do not rely only on titles or headings.
 
-## G.3. COMPLETION
+## H.3. COMPLETION
 
 After checking cross-lesson overlap, stop and report:
 - overlaps found,
@@ -801,20 +899,20 @@ Wait for the user's decision.
 
 Apply only approved changes.
 
-Ask for permission to proceed to Step H.
+Ask for permission to proceed to Step I.
 
 ---
 
-# 13. STEP H - FINAL REPORT
+# 14. STEP I - FINAL REPORT
 
-## H.1. START CONDITION
+## I.1. START CONDITION
 
 Start only after one condition is true:
-1. Step G has been completed.
-2. Step G has been skipped because its start conditions were not met.
-3. The user explicitly instructed the agent to skip Step G.
+1. Step H has been completed.
+2. Step H has been skipped because its start conditions were not met.
+3. The user explicitly instructed the agent to skip Step H.
 
-## H.2. REPORT CONTENTS
+## I.2. REPORT CONTENTS
 
 Provide a concise final report in the chat.
 
@@ -824,9 +922,10 @@ Include:
 - extract files created,
 - extract files modified, if any,
 - INDEX_FILE updates,
+- GLOSSARY_FILE updates,
 - intra-lesson duplicates found,
-- whether Step G was completed, skipped, or not applicable,
-- cross-lesson duplicates found, if Step G was completed,
+- whether Step H was completed, skipped, or not applicable,
+- cross-lesson duplicates found, if Step H was completed,
 - decisions made by the user,
 - changes applied,
 - unresolved issues,
@@ -840,7 +939,7 @@ Do not delete raw files, downloaded PNG files, or PNG map files.
 
 ---
 
-# 14. GENERAL SAFETY AND BEHAVIOR RULES
+# 15. GENERAL SAFETY AND BEHAVIOR RULES
 
 The agent must:
 - be deterministic,
@@ -849,6 +948,8 @@ The agent must:
 - not create extract content unsupported by source files,
 - not modify existing extracts without approval,
 - not modify INDEX_FILE beyond the approved scope,
+- not use GLOSSARY_FILE as a substitute for agent-oriented extract files,
+- keep GLOSSARY_FILE beginner-friendly because it is intended primarily for the human learner,
 - report uncertainty explicitly,
 - preserve operationally relevant information,
 - prefer asking for user decision over silently resolving ambiguous conflicts,
