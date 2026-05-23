@@ -33,7 +33,7 @@ The main learning goal is to separate visual perception from deterministic puzzl
 
 ## Status
 
-Current status: deterministic foundation implemented, vision parser not started.
+Current status: the application now solves the task end to end on real Hub and OpenAI services, with `gpt-5.5` as the default vision model and a verified final flag result.
 
 Implemented so far:
 
@@ -44,10 +44,28 @@ Implemented so far:
 - unit tests for rotation and solving,
 - Hub client for image download and one-tile rotation requests,
 - masked request and response logging helpers.
+- image parser with tile-by-tile workflow, bounded retry, and solved-board cache support.
+- deterministic board-rectangle isolation based on line and contrast analysis.
+- parser validation and failure handling with explicit failure artifacts.
+- guarded workflow orchestration with persisted run artifacts and bounded rotation execution.
+- final end-to-end verification with successful flag capture on the real exercise.
 
-No hub requests should be sent by this app until configuration, logging, and request masking are implemented.
+Latest verified production-like learning result:
 
-No LLM-powered or vision-powered implementation is approved yet. The LLM and vision workflow must pass `_agent/instructions/llm_design_checklist.md` before implementation starts.
+- run date: `2026-05-23`,
+- run id: `20260523T155302Z`,
+- vision model: `gpt-5.5`,
+- planned rotations: `7`,
+- executed rotations: `7`,
+- completion result: final flag returned successfully.
+
+Source snapshot of the successful app version:
+
+- `src/apps/L7_electricity/L7_electricity_gpt_5_5/`
+
+This folder stores the application files and documentation for the version that solved the task with `gpt-5.5`.
+
+The LLM and vision workflow passed `_agent/instructions/llm_design_checklist.md` for the approved MVP1 scope recorded below.
 
 ## Workflow
 
@@ -58,14 +76,22 @@ Planned application flow:
 3. Save the current board image to `data/L7_electricity/input/current_board.png`.
 4. Download or load the target solved board image.
 5. Save the target board image to `data/L7_electricity/references/solved_board.png`.
-6. Parse each board image into a structured 3x3 tile map.
-7. Validate that both parsed boards contain exactly nine known tile descriptors.
-8. Compare each current tile with the target tile at the same coordinate.
-9. Calculate the number of clockwise rotations needed for each tile.
-10. Send one verification request per planned rotation.
-11. Save masked request and response records under `data/L7_electricity/output/`.
-12. After a rotation batch, download the current board again and verify it against the target board.
-13. Stop when the hub returns the final flag or when validation detects that the parsed board state is inconsistent.
+6. Detect or isolate the actual board rectangle inside the full PNG.
+7. Parse each board image into a structured 3x3 tile map.
+8. Validate that both parsed boards contain exactly nine known tile descriptors.
+9. Compare each current tile with the target tile at the same coordinate.
+10. Calculate the number of clockwise rotations needed for each tile.
+11. Send one verification request per planned rotation.
+12. Save masked request and response records under `data/L7_electricity/output/`.
+13. After a rotation batch, download the current board again and verify it against the target board.
+14. Stop when the hub returns the final flag or when validation detects that the parsed board state is inconsistent.
+
+Current implementation note:
+
+- all workflow steps are now implemented and verified on real services,
+- the board rectangle is isolated before tile parsing,
+- the parser saves per-run diagnostics for `before`, `solved_reference`, and `after` phases,
+- the default `gpt-5.5` model produced a stable enough parse to finish the task.
 
 The first implementation should prefer a small fixed workflow. A broader agent loop can be added later if it improves learning value, but it should call the same deterministic tools instead of replacing them with free-form model reasoning.
 
@@ -166,19 +192,21 @@ The parser should be a fixed workflow, not a free-form agent loop.
 Planned parsing steps:
 
 1. Load one local PNG file from `data/L7_electricity/input/current_board.png` or `data/L7_electricity/references/solved_board.png`.
-2. Deterministically crop the full 3x3 board into 9 tile images and save temporary crops under `data/L7_electricity/cache/tiles/`.
-3. Send either:
+2. Detect or isolate the actual board rectangle inside the full PNG.
+3. Deterministically crop the board rectangle into 9 tile images and save temporary crops under `data/L7_electricity/cache/tiles/`.
+4. Send either:
    - one tile crop at a time to the vision model, or
    - one prepared 3x3 board image only if tile-by-tile parsing proves worse in practice.
-4. Ask the model to return only the exits visible on that tile.
-5. Validate the model output against the agreed schema and allowed values.
-6. Assemble the 9 validated tile outputs into one board map.
-7. Convert the board map into a `Board` domain object.
-8. Stop with a hard failure if validation fails and no bounded retry remains.
+5. Ask the model to return only the exits visible on that tile.
+6. Validate the model output against the agreed schema and allowed values.
+7. Assemble the 9 validated tile outputs into one board map.
+8. Convert the board map into a `Board` domain object.
+9. Stop with a hard failure if validation fails and no bounded retry remains.
 
 Default design choice:
 
 - prefer tile-by-tile parsing over whole-board parsing, because each model call then sees one small local classification task instead of 9 coupled decisions.
+- do not crop from the full image until the board rectangle has first been isolated or detected.
 
 ### Model Steps
 
@@ -190,8 +218,8 @@ Step A:
 - Goal: identify which edges contain cable exits.
 - Why model is needed: image understanding is the uncertain part that is hard to replace with plain code at this stage.
 - Output: one tiny structured record describing only that tile.
-- Planned primary model: `gpt-5-mini`.
-- Planned fallback model: `gpt-4.1` if the primary model proves unreliable on small tile-edge details.
+- Planned primary model: `gpt-5.5`.
+- Planned fallback model: `gpt-5-mini` if a cheaper model is needed for comparison on small tile-edge details.
 
 Step B:
 
@@ -270,8 +298,8 @@ Prompt constraints:
 
 Model selection rule:
 
-- default `L7_ELECTRICITY_VISION_MODEL` to `gpt-5-mini`,
-- switch to `gpt-4.1` if evaluation on real tile crops shows that `gpt-5-mini` misses edge exits too often,
+- default `L7_ELECTRICITY_VISION_MODEL` to `gpt-5.5`,
+- switch to `gpt-5-mini` only for cost or latency experiments after `gpt-5.5` establishes the best-known parsing baseline,
 - do not introduce a larger agent-style reasoning model unless a later review changes the approved boundary.
 
 ### Context And Tool Exposure
@@ -374,10 +402,17 @@ Planned implementation steps:
 8. Completed: add masked request and response logging.
 9. Completed: define the image parsing design in this README with enough detail for the LLM design checklist.
 10. Completed: review the LLM and vision scope with `_agent/instructions/llm_design_checklist.md`.
-11. Pending: after the design review passes, implement the image parser.
-12. Pending: add parser validation and failure handling.
-13. Pending: run the full workflow in a guarded mode with a small maximum number of rotation requests.
-14. Pending: verify the final board state and capture the hub flag when returned.
+11. Completed: after the design review passed, implement the image parser.
+12. Completed: add parser validation and failure handling.
+13. Completed: run the full workflow in a guarded mode with a small maximum number of rotation requests.
+14. Completed: verify the final board state and capture the hub flag when returned.
+
+Current outcome of the final verification steps:
+
+- guarded runs were used to compare parsing quality across `gpt-5-mini`, `gpt-5.4-mini`, and `gpt-5.5`,
+- TLS verification stayed enabled through the local CA bundle approach documented in `TROUBLESHOOTING.md`,
+- deterministic board detection and light inner tile crop fixed the major preprocessing errors,
+- the final full run on `gpt-5.5` completed successfully and returned the final exercise flag.
 
 The recommended first milestone is the deterministic solver plus tests. This gives a stable foundation before any uncertain vision step is introduced.
 
@@ -388,17 +423,18 @@ Required environment variables:
 | Name | Purpose |
 |---|---|
 | `AI_DEVS_API_KEY` | API key used to authenticate hub requests. |
-| `HUB_DATA_BASE_URL` | Base hub data location used to build the board image request. |
+| `OPENAI_API_KEY` | API key used to call the OpenAI vision model for tile parsing. |
 | `HUB_VERIFY_URL` | Hub verification endpoint used for rotation requests. |
-| `HUB_SOLVED_IMAGE_URL` | Location of the solved reference image. |
 
 Optional environment variables:
 
 | Name | Purpose |
 |---|---|
+| `HUB_DATA_BASE_URL` | Optional override for the base hub data location. If omitted, the app derives it from `HUB_VERIFY_URL`. |
+| `HUB_SOLVED_IMAGE_URL` | Optional override for the solved reference image URL. If omitted, the app derives it from `HUB_VERIFY_URL`. |
 | `L7_ELECTRICITY_RESET_ON_START` | When enabled, download the board with the hub reset option before solving. |
 | `L7_ELECTRICITY_MAX_ROTATIONS` | Hard guard for the maximum number of rotation requests in one run. |
-| `L7_ELECTRICITY_VISION_MODEL` | Vision model name used by the image parser after design approval. Recommended default: `gpt-5-mini`. Planned fallback: `gpt-4.1`. |
+| `L7_ELECTRICITY_VISION_MODEL` | Vision model name used by the image parser after design approval. Recommended default: `gpt-5.5`. Comparison fallback: `gpt-5-mini`. |
 
 Secrets must stay in `.env` or another approved secret store. Source code, Markdown files, reports, logs, and commit messages must not contain real API keys, private URLs, tokens, or unmasked request payloads.
 
@@ -413,6 +449,9 @@ Runtime files should live outside the application source directory:
 | `data/L7_electricity/cache/tiles/` | Optional prepared tile crops or normalized images. |
 | `data/L7_electricity/output/run_report.json` | Chronological run report with masked requests and responses. |
 | `data/L7_electricity/output/rotation_plan.json` | Calculated rotation plan for review and debugging. |
+| `data/L7_electricity/output/parser_failure.json` | Latest structured parser failure artifact when board or tile parsing stops on validation. |
+| `data/L7_electricity/output/diagnostics/{RUN_ID}/` | Frozen parser snapshots for `before`, `solved_reference`, and `after` analysis, including source images, board crops, tile crops, and parser JSON. |
+| `data/L7_electricity/cache/tiles/current_board/*.png` | Latest generated tile crops from the current board image for parser debugging. |
 
 The run report should never store the raw API key. Request payloads should either omit `apikey` or store it as `***REDACTED***`.
 
@@ -428,20 +467,30 @@ Planned source files:
 | `rotation.py` | Direction rotation and tile normalization helpers. |
 | `solver.py` | Deterministic board comparison and rotation sequence calculation. |
 | `hub_client.py` | Board image download and rotation verification requests. |
-| `image_parser.py` | Image-to-board-map parser, added only after LLM design approval. |
+| `image_parser.py` | Tile-by-tile image-to-board parser with bounded retry, schema validation, and solved-board cache support. |
 | `logging_utils.py` | Masked request, response, and artifact persistence. |
+| `workflow.py` | Guarded end-to-end orchestration, artifact writing, and bounded rotation execution. |
 
 Each class, function, and method should include a short `#` purpose comment, following the repository instructions.
 
 ## Run
 
-Planned command:
+Current command:
 
 ```powershell
-.\venv\Scripts\python.exe -m src.apps.L7_electricity.main
+.\venv\Scripts\python.exe -m src.apps.L7_electricity.L7_electricity_gpt_5_5.main
 ```
 
-The command is available now and currently loads configuration, ensures runtime directories, and prints a readiness summary.
+For environments affected by Norton HTTPS inspection, run with the CA bundle workaround documented in `TROUBLESHOOTING.md`:
+
+```powershell
+$bundle=(Resolve-Path .\data\L6_categorize\cache\requests_ca_bundle.pem).Path
+$env:REQUESTS_CA_BUNDLE=$bundle
+$env:SSL_CERT_FILE=$bundle
+.\venv\Scripts\python.exe -m src.apps.L7_electricity.L7_electricity_gpt_5_5.main
+```
+
+The command now loads configuration, ensures runtime directories, downloads real images, runs the guarded workflow, and writes artifacts for both successful and failed runs.
 
 ## Verification
 
@@ -452,17 +501,29 @@ Verification should be added incrementally:
 3. Run unit tests for board solving from hand-written current and target maps.
 4. Validate that malformed board maps fail before any hub request is sent.
 5. Validate that masked logging never persists raw secrets.
-6. After image parsing is implemented, compare parser output against a manually reviewed board map.
-7. Run a guarded end-to-end attempt with `L7_ELECTRICITY_MAX_ROTATIONS` set to a small explicit value.
-8. Confirm that the final run stops with either a hub flag or a clear validation error.
+6. Run parser tests for cache reuse, low-confidence retry, invalid tile failure, and too-small image failure.
+7. Inspect generated tile crops to confirm they contain actual board tiles before trusting the parser result.
+8. After image parsing is implemented, compare parser output against a manually reviewed board map.
+9. Run a guarded end-to-end attempt with `L7_ELECTRICITY_MAX_ROTATIONS` set to a small explicit value.
+10. Confirm that the final run stops with either a hub flag or a clear validation error.
 
 The simplest practical first check after implementing the solver should be:
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest tests.L7_electricity.test_rotation_and_solver
+.\venv\Scripts\python.exe -m unittest tests.L7_electricity.test_rotation_and_solver tests.L7_electricity.test_image_parser
 ```
 
-This focused suite currently verifies deterministic tile rotation and board solving from hand-written maps.
+This focused suite currently verifies deterministic tile rotation, board solving, parser retry behavior, cache reuse, and failure artifacts.
+
+Current real-world verification result:
+
+- guarded comparison runs were executed against real Hub and OpenAI services,
+- TLS verification succeeded when using the local CA bundle workaround from `TROUBLESHOOTING.md`,
+- `gpt-5.4-mini` underperformed on this task and failed earlier during parsing,
+- `gpt-5.5` completed guarded diagnostic runs consistently enough to justify becoming the default model,
+- final full run `20260523T155302Z` executed all `7` planned rotations and returned the final exercise flag,
+- the successful run artifacts are stored in `data/L7_electricity/output/diagnostics/20260523T155302Z/`,
+- the working application version is stored in `src/apps/L7_electricity/L7_electricity_gpt_5_5/`.
 
 ## Assumptions And Risks
 
@@ -476,6 +537,7 @@ Assumptions:
 Risks:
 
 - Vision models may misread small cable shapes, especially on a full 3x3 image.
+- Deterministic tile cropping can fail completely if the workflow assumes that the full PNG already equals the board rectangle.
 - A wrong parsed tile can cause unnecessary rotations and may require a reset.
 - The board state changes after each successful rotation request, so stale image data must not be reused for final verification.
 - The hub may rate-limit or return transient errors during multi-request rotation batches.
@@ -484,6 +546,7 @@ Risks:
 Mitigations:
 
 - Parse and validate structured tile maps before solving.
+- Inspect generated crops and add deterministic board-rectangle isolation before tile classification.
 - Prefer cropped or normalized tile images if full-board parsing is unreliable.
 - Keep a hard maximum number of rotation requests per run.
 - Verify the refreshed board after each planned batch.
@@ -512,7 +575,7 @@ Checklist:
 | Scope And Workflow | Deterministic code is planned for stable logic, and LLM calls are reserved for language or reasoning tasks. | YES | Only tile-image interpretation uses a vision model; rotation math, validation, solving, and request sequencing stay in Python. |
 | Scope And Workflow | Each planned workflow step has a clear purpose. | YES | README now defines one purpose per step from local PNG load through bounded parser retry and deterministic solving. |
 | Model And Prompt Plan | Each LLM step has a reason for using a model instead of ordinary code. | YES | The tile parser uses a model only for visual exit recognition, which is the one uncertain perception task. |
-| Model And Prompt Plan | The selected model for each step matches the expected difficulty of that step. | YES | `L7_ELECTRICITY_VISION_MODEL` is scoped to `gpt-5-mini` as the primary model for narrow tile-by-tile image classification, with `gpt-4.1` as the fallback if small edge details need a stronger vision pass. |
+| Model And Prompt Plan | The selected model for each step matches the expected difficulty of that step. | YES | `L7_ELECTRICITY_VISION_MODEL` is scoped to `gpt-5.5` as the primary model for narrow tile-by-tile image classification after guarded comparison runs showed the more capable model was more stable on small edge details. |
 | Model And Prompt Plan | Prompts are planned to be short, focused, and limited to the current step. | YES | The planned prompt covers only one tile crop, one coordinate, one exit schema, and one confidence field. |
 | Model And Prompt Plan | Token usage is intentionally limited for both model input and model output. | YES | The design prefers tile-by-tile parsing, tiny JSON output, no full history, and no full-board prompt by default. |
 | Model And Prompt Plan | Structured outputs are planned wherever code will consume the result. | YES | The parser schema explicitly defines `coordinate`, `exits`, and `confidence`, and the assembled board map is defined before implementation. |

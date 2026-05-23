@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from src.apps.L7_electricity.models import Board, Coordinate, Tile, all_coordinates
-from src.apps.L7_electricity.rotation import find_clockwise_turns_to_match, rotate_tile_clockwise
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.models import Board, Coordinate, Tile, all_coordinates
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.rotation import find_clockwise_turns_to_match, rotate_tile_clockwise
 
 
 # Represents the required clockwise turns for one board coordinate.

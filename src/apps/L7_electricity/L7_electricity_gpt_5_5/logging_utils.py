@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.apps.L7_electricity.config import AppPaths, HubConfig
-from src.apps.L7_electricity.hub_client import (
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.config import AppPaths, HubConfig
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.hub_client import (
     HubImageResponse,
     HubVerifyResponse,
     build_rotate_payload,

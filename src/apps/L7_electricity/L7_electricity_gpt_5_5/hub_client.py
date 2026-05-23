@@ -8,8 +8,8 @@ from urllib.parse import urlencode
 
 import requests
 
-from src.apps.L7_electricity.config import HubConfig
-from src.apps.L7_electricity.models import Coordinate
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.config import HubConfig
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.models import Coordinate
 
 
 REQUEST_TIMEOUT_SECONDS = 30

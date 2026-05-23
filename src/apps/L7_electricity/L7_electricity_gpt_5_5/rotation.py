@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.apps.L7_electricity.models import Direction, Tile
+from src.apps.L7_electricity.L7_electricity_gpt_5_5.models import Direction, Tile
 
 
 DIRECTION_ORDER = (
