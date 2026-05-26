@@ -13,9 +13,9 @@
 
 ## Purpose
 
-This file records the first deterministic support ideas for the `gpt-5-mini` experiment track.
+This file records the first deterministic support ideas for the paused `gpt-5-mini` experiment track.
 
-The working hypothesis is simple:
+The archived working hypothesis is simple:
 
 - `gpt-5-mini` may be good enough,
 - but only if we narrow the perception problem and add stronger deterministic guardrails.
@@ -143,10 +143,11 @@ Risk:
 
 ## Next Starting Point
 
-The most practical next move is:
+If work on this track resumes later, the most practical restart point is:
 
 1. define the deterministic solved reference map,
 2. assemble a first difficult tile-crop benchmark from existing diagnostics,
 3. compare `gpt-5-mini` with `gpt-5.5` on that dataset before changing parser architecture.
 
 That order keeps the early work measurable and avoids premature complexity.
+Until then, this file should be treated as preserved design context rather than an active task list.

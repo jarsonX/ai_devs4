@@ -20,7 +20,7 @@
 
 ## Purpose
 
-`L7_electricity_gpt_5_mini` is an experimental documentation track for building a cheaper version of the `electricity` solution around `gpt-5-mini`.
+`L7_electricity_gpt_5_mini` is a paused experimental documentation track for a cheaper version of the `electricity` solution around `gpt-5-mini`.
 
 The task remains the same:
 
@@ -35,22 +35,26 @@ The goal of this track is different from the working `gpt-5.5` snapshot:
 - keep the stable preprocessing improvements,
 - add extra deterministic support so that `gpt-5-mini` has a smaller and easier perception job.
 
+This documentation is being kept so the experiment can be resumed later without rebuilding the design context from scratch.
+
 ## Status
 
-Current status: this track is still in the design phase.
+Current status: this track is paused.
+
+It should be read as a design snapshot for a possible future return, not as an active implementation plan.
 
 What is already known:
 
 - the `gpt-5.5` version solved the task end to end on real services,
 - `gpt-5-mini` was promising enough to reach guarded diagnostic runs,
 - `gpt-5-mini` was not yet stable enough to be trusted as the default parser model,
-- the next step is to reduce the burden on the model with deterministic support layers.
+- the next technical direction would be to reduce the burden on the model with deterministic support layers.
 
-Current intention:
+Current decision:
 
-- do not compete with the working `gpt-5.5` version yet,
-- first reduce avoidable ambiguity for `gpt-5-mini`,
-- then run controlled comparisons on the same inputs.
+- keep `gpt-5.5` as the active working version,
+- stop active implementation work on the `gpt-5-mini` variant for now,
+- preserve the design and notes in case the experiment becomes worth resuming later.
 
 Reference working snapshot:
 
@@ -74,7 +78,7 @@ Planned application flow for this track:
 Current workflow implementation state:
 
 - download, preprocessing, solving, and rotation execution already exist in the main working version,
-- the mini-specific deterministic supports are still TBU.
+- the mini-specific deterministic supports were not implemented before this track was paused.
 
 ## Board Representation
 
@@ -150,7 +154,7 @@ The current plan is to add the following deterministic supports around `gpt-5-mi
 
 ## Implementation Plan
 
-Planned steps for this track:
+Planned steps for this track if work resumes:
 
 1. Create this design and notes workspace.
 2. Define the deterministic solved reference map format.
@@ -163,7 +167,7 @@ Planned steps for this track:
 Current completion state:
 
 - step `1` is done,
-- steps `2` to `7` are TBU.
+- steps `2` to `7` are paused and remain TBU.
 
 ## Configuration
 
@@ -176,20 +180,20 @@ Expected configuration is likely to remain close to the working app:
 | `HUB_VERIFY_URL` | Rotation verification endpoint. |
 | `L7_ELECTRICITY_VISION_MODEL` | Expected to be `gpt-5-mini` for this track. |
 
-Configuration details that change runtime layout or cache strategy are still TBU.
+Configuration details that change runtime layout or cache strategy were not finalized before the experiment was paused.
 
 ## Data Paths
 
-Likely data-path options still need a final decision:
+Likely data-path options still need a final decision if this track is resumed:
 
 - reuse `data/L7_electricity/...` and isolate only cache keys,
 - or create a dedicated experiment path such as `data/L7_electricity_gpt_5_mini/...`.
 
-This decision is currently TBU.
+This decision is currently TBU because the experiment is paused.
 
 ## Main Modules
 
-Expected module ownership for this track:
+Expected module ownership for this track if implementation resumes:
 
 | Module | Planned role |
 |---|---|
@@ -199,7 +203,7 @@ Expected module ownership for this track:
 | `workflow.py` | Add comparison and validation checkpoints. |
 | `benchmark / harness module` | Planned new support for frozen tile-crop evaluation. |
 
-The exact code layout is still TBU.
+The exact code layout is still TBU because implementation never moved past the design workspace.
 
 ## Run
 
@@ -209,11 +213,12 @@ Probable command shape:
 .\venv\Scripts\python.exe -m src.apps.L7_electricity.L7_electricity_gpt_5_5.main
 ```
 
-Mini-track specific run commands are still TBU.
+There is no active mini-track run command at the moment.
+Mini-track specific run commands are still TBU if the experiment returns.
 
 ## Verification
 
-Planned verification sequence:
+Planned verification sequence if work resumes:
 
 1. Confirm that the deterministic solved reference map matches the known target layout.
 2. Run the regression harness on saved difficult tile crops.
@@ -248,6 +253,7 @@ Current state:
 
 - the original working `L7_electricity` app already passed its MVP1 LLM design review,
 - this mini track has not yet recorded a separate review for any new LLM workflow change,
+- the experiment was paused before a separate mini-specific implementation scope was approved,
 - if the two-stage parser becomes more than a prompt tweak, a new scoped review should be added here.
 
 ## Reference Alignment
@@ -259,7 +265,7 @@ This experimental track follows the same reference family as the working solutio
 - `_agent/references/L1_structured_outputs_and_validation.md`
 - `_agent/references/L4_image_recognition_and_generation_agents.md`
 
-The key difference is not the course goal, but the engineering trade-off:
+The key difference is not the course goal, but the engineering trade-off preserved in these notes:
 
 - accept more deterministic support work,
 - in exchange for a chance to make `gpt-5-mini` good enough for the same task.
