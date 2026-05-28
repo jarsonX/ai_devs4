@@ -14,6 +14,8 @@
 - Teach the reasoning behind the solution, not only the commands or code to type.
 - Prefer senior-level design quality, readable implementation, and existing project conventions.
 - Application code uses a short purpose comment for each class, function, and method.
+- Purpose comments should be technical but approachable: explain why the class, function, or method exists in plain English, using concrete words a junior learner can follow.
+- Prefer comments that describe intent, boundary, or non-obvious trade-off. Avoid comments that merely repeat the code.
 - Purpose comments must use regular `#` comment lines, not Python docstrings. Use:
   `# Comment line 1`
   `# Comment line 2` when a second line is needed.
@@ -58,6 +60,29 @@ A README should usually include these sections:
 - `Verification`: the simplest practical way to check that the app works.
 
 README may include additional sections when useful, such as `HTTP Contract`, `Tool Strategy`, `Data Flow`, `Model Role`, `Limitations`, `Assumptions`, `LLM Design Reviews`, or `Troubleshooting`.
+
+### README Writing Style
+
+README files should be technical but approachable. Write for a junior learner returning to the project later: precise enough to implement from, but clear enough to understand without decoding architecture jargon.
+
+Prefer:
+
+- a short plain-English explanation before a complex contract, table, or workflow,
+- tables for structured facts such as configuration, schemas, modules, data paths, tool contracts, and review records,
+- concrete examples when a term may be misunderstood,
+- plain words over architecture jargon where precision is not lost,
+- explaining terms such as `agentic`, `guard`, `schema`, or `validation` when first used,
+- describing why a design choice matters, not only what the rule is.
+
+Avoid:
+
+- replacing useful tables with long prose,
+- making README read like a security audit or internal architecture spec,
+- long uninterrupted checklists without context,
+- unexplained phrases such as `state machine owns permissions`,
+- duplicating detailed reasoning that belongs in DEV_NOTES.
+
+For LLM apps, keep README as the source of truth for the accepted design and approved scope. If checklist evidence or trade-off notes become too detailed, summarize the result in README and move the detailed reasoning to DEV_NOTES.
 
 ### Markdown Table Of Contents
 
