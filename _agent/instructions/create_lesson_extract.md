@@ -834,7 +834,7 @@ A glossary description should explain what the term means in practice, not only 
 
 Do not use GLOSSARY_FILE to store operational instructions that belong in extract files.
 
-Do not add secrets, real API URLs, credentials, tokens, or internal endpoints.
+Do not add secrets, course FLAGS, task completion answers, challenge verification outputs, real API URLs, credentials, tokens, or internal endpoints.
 
 ## G.5. COMPLETION
 

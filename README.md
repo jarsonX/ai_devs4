@@ -18,7 +18,7 @@ This repository is both a learning workspace and a portfolio of applied AI engin
 
 ## About the course
 
-AI_devs is a hands-on course focused on building real-world applications with Large Language Models and AI APIs.
+AI_devs is a hands-on course focused on building software applications that include AI components, such as Large Language Model workflows, AI API integrations, and model-assisted data processing.
 
 More information about the course:
 https://www.aidevs.pl/
@@ -45,11 +45,11 @@ This is intentionally different from treating an agent as a black-box task solve
 
 The repository therefore documents not only final code, but also a way of working: using AI as an engineering partner while preserving human responsibility for direction, validation, learning, and quality. In some places, the repository also includes concrete evidence of that workflow, such as [L4_sendit_MVP2_DEV_NOTES.md](src/apps/L4_sendit/L4_sendit_MVP2/docs/L4_sendit_MVP2_DEV_NOTES.md), where AI-generated implementation choices are explicitly reviewed, challenged, and refined from a developer perspective.
 
-For transparency and educational value, this repository includes publishable instruction and workflow files used during the human-AI collaboration process while building the applications in this repository, including [AGENTS.md](AGENTS.md) and selected supporting documents in [`_agent/`](_agent/). They are published as real working materials that may help others develop more structured and responsible ways of working with AI tools. Some private agent knowledge base materials are intentionally omitted, as explained below.
+For transparency and educational value, this repository includes publishable instruction and workflow files used during the human-AI collaboration process while building the applications in this repository. [AGENTS.md](AGENTS.md) is the compact always-active instruction file and router for the coding agent. More detailed conditional playbooks live in [`_agent/instructions/`](_agent/instructions/) and are loaded for specific work, such as app documentation, LLM design reviews, debugging, external API safety, or agent reference maintenance. These files are published as real working materials that may help others develop more structured and responsible ways of working with AI tools. Some private agent knowledge base materials are intentionally omitted, as explained below.
 
 ### Agent knowledge base availability
 
-Some files used during work with AI coding agents are intentionally **not included in the public repository**. This mainly applies to parts of the agent knowledge base: curated reference notes that were built from course materials and adapted for the author's local agent workflow.
+Some files used during work with AI coding agents are intentionally **not included in the public repository**. This mainly applies to parts of the agent knowledge base: curated reference notes that were built from course materials and adapted for the author's local agent workflow. In this repository, `_agent/instructions/` contains publishable operational playbooks, while `_agent/references/` may contain or point to private course-derived reference material.
 
 Because those materials are derived from course content, they are also connected to the work and intellectual property of the course authors. To respect their rights, effort, and ownership of the original learning materials, the derived agent knowledge base is kept private even though it may be used locally while developing the repository.
 
@@ -81,7 +81,7 @@ The repository contains **code created while working through the course tasks**.
 To respect the course rules and good development practices:
 
 - **no API keys or secrets are included** in the repository (they are managed via environment variables),
-- **answers submitted to the course platform are not published**,
+- **answers submitted to the course platform, including course FLAGS and task completion answers, are not published**,
 - **no original course content or datasets** are included.
 
 Some solutions may be inspired by publicly discussed approaches within the course community or by examples provided during the course.
