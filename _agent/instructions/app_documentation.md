@@ -23,6 +23,7 @@ A README should usually include these sections:
 - `Run`: the command or entrypoint used to run the app.
 - `Main Modules`: the main files/modules and their responsibilities.
 - `Verification`: the simplest practical way to check that the app works.
+- `What This Task Should Teach`: required final section added when work on the app is complete. It should explain the main learning points of the task, using concrete lessons from the implemented app. This section must be the last section in the README.
 
 README may include additional sections when useful, such as `HTTP Contract`, `Tool Strategy`, `Data Flow`, `Model Role`, `Limitations`, `Assumptions`, `LLM Design Reviews`, or `Troubleshooting`.
 

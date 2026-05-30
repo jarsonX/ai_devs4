@@ -40,6 +40,7 @@ Its goal is to explain the core idea of an agent-style application without the f
 - [Serialization Rule](#serialization-rule)
 - [Assumptions](#assumptions)
 - [Status](#status)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -404,3 +405,25 @@ At the tool boundary, data returned to the model should be JSON-serializable dic
 
 This README documents the current agreed direction for EDU1.
 Exact implementation details inside each file are still to be designed.
+
+## What This Task Should Teach
+
+This task is mainly about learning the shape of an agent-style application in a small, inspectable setting.
+The important lesson is that an agent does not need to control every step; deterministic setup can prepare clean state, and the model can make one narrow decision from a closed list.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Start with a small agent problem. | EDU1 mirrors selected `L2_findhim` ideas without the full complexity of the original task. |
+| Give the model a closed choice. | OpenAI chooses the southernmost city only from the provided city list. |
+| Validate before updating state. | `selectedCity` should enter runtime state only after `validate_selected_city` accepts it. |
+| Use staged tool exposure. | The model-driven stages see only the tools needed for selection or finalization. |
+| Keep tool outputs JSON-serializable. | Tool boundaries use dictionaries and lists so model interactions remain easy to inspect. |
+| Separate learning design from runtime code. | The README documents the intended boundaries before the implementation becomes more complex. |
+
+The practical pattern to remember:
+
+```text
+deterministic setup -> closed model choice -> validation -> deterministic finalization
+```

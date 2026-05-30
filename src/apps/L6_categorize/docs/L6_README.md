@@ -14,6 +14,7 @@
 - [Run](#run)
 - [Verification](#verification)
 - [LLM Design Status](#llm-design-status)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -217,3 +218,25 @@ Rationale:
 - the implementation is intentionally lightweight and does not introduce production LLM architecture.
 
 If the scope grows to include automatic prompt rewriting, autonomous retries, or a local model-driven workflow, the design should be reviewed with `_agent/instructions/llm_design_checklist.md` before implementation.
+
+## What This Task Should Teach
+
+This task is mainly about prompt iteration under a tight external budget.
+The important lesson is that a small runner can be enough when the local app does not need to classify items itself; its job is to control inputs, keep prompts short, and preserve evidence from each Hub response.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Keep the prompt short and stable. | The fixed instruction prefix stays small so the Hub model has room for the item data and can benefit from caching. |
+| Put variable data at the end. | Each request appends the item identifier and description after the stable rule text. |
+| Let the remote model do the classification. | Local code sends prompts and records responses instead of hardcoding labels for individual rows. |
+| Reset before full attempts. | A new attempt starts with a reset prompt because budget and scoring state are shared across the 10 items. |
+| Save chronological run evidence. | The run report records reset, CSV download, parsing, and every item verification event. |
+| Keep the scope small when it works. | No autonomous prompt rewriter is needed because the lightweight runner already solved the exercise. |
+
+The practical pattern to remember:
+
+```text
+budget reset -> fresh CSV -> short cached prompt -> per-item verification -> chronological report
+```

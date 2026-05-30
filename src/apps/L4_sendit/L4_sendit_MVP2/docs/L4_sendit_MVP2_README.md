@@ -25,6 +25,7 @@
 - [Run](#run)
 - [Main Modules](#main-modules)
 - [Verification](#verification)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -891,3 +892,25 @@ The current repository state also includes a successful guarded Hub submission:
 - `verification_payload.json` is saved with a masked API key
 - `hub_response.json` records HTTP `200`
 - `run_report.md` records `submission_requested: True` for the explicit `--submit` run
+
+## What This Task Should Teach
+
+This task is mainly about designing an AI-assisted workflow as a sequence of narrow, validated stages.
+The important lesson is that the model can help with command understanding, source selection, and evidence extraction, but code must own file access, schema validation, stable calculations, rendering, and guarded submission.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Identify the task before selecting sources. | Stage 1 produces `TaskUnderstanding` so the app knows what documentation needs matter. |
+| Select from an inventory, not from the filesystem directly. | Stage 3 can choose only paths discovered by the deterministic reference inventory. |
+| Extract evidence before executing the task. | Stage 4 turns selected source content into validated facts, missing facts, conflicts, and uncertainty notes. |
+| Move interpretation into evidence when possible. | Shipment category and declaration terminology are extracted as evidence-backed facts instead of hidden executor rules. |
+| Validate every model boundary. | Task understanding, source selection, evidence, and task results are checked before downstream use. |
+| Keep submission explicit and masked. | Stage 7 writes audit artifacts and submits to the Hub only when `--submit` is used. |
+
+The practical pattern to remember:
+
+```text
+command -> task schema -> source inventory -> selected evidence -> validated task result -> deterministic rendering -> guarded submission
+```

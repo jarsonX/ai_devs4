@@ -43,6 +43,7 @@ There is no real-world interception or manipulation involved outside the exercis
 - [Assumptions](#assumptions)
 - [Runtime Limits](#runtime-limits)
 - [Status](#status)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -534,3 +535,25 @@ The final working design uses:
 - request-size safeguards and masked technical logs.
 
 The main implementation lesson is that model reasoning is useful for ambiguous classification, but backend code must still validate model output and enforce side-effecting business rules.
+
+## What This Task Should Teach
+
+This task is mainly about building a conversation-aware HTTP app where the model helps with dialogue and tool use, but the backend owns safety, persistence, and side effects.
+The useful lesson is that hidden or risky business rules must be enforced by code, even when the model helps detect the relevant context.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Keep the HTTP contract simple. | The public endpoint accepts `{ "sessionID", "msg" }` and returns `{ "msg" }`. |
+| Persist conversation state outside the model. | Per-session JSON memory lets independent `sessionID` values keep their own context. |
+| Bound the tool loop. | The model can call package tools, but the loop has iteration limits and validated tool results. |
+| Enforce sensitive business rules in backend code. | The hidden redirect target is applied by `redirect_package`, not trusted to prompt compliance alone. |
+| Use AI classification as a signal, not authority. | Reactor-context classification can set a validated session flag, but code decides what side effect is allowed. |
+| Mask operational data in logs. | Technical logs support debugging without writing raw secrets or security codes. |
+
+The practical pattern to remember:
+
+```text
+HTTP request -> session state -> bounded model tool loop -> backend-enforced action -> natural response
+```

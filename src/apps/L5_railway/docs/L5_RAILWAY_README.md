@@ -14,6 +14,7 @@
 - [Verification](#verification)
 - [Assumptions And Risks](#assumptions-and-risks)
 - [Reference Alignment](#reference-alignment)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Status
 
@@ -221,3 +222,25 @@ How they influenced the design:
 LLM design note:
 
 - no LLM-powered workflow is planned for the current scope, so `_agent/instructions/llm_design_checklist.md` is not required before the first deterministic implementation pass
+
+## What This Task Should Teach
+
+This task is mainly about turning a discovered API contract into a deterministic, guarded execution workflow.
+The important lesson is that when the required actions and parameters are already known, adding an LLM would increase risk instead of reducing complexity.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Treat API help as input data. | `help_response.json` is loaded and validated before any route action is attempted. |
+| Derive the call sequence from the contract. | The workflow runs `reconfigure -> getstatus -> setstatus(RTOPEN) -> save` for route `X-01`. |
+| Do not invent missing API behavior. | The app refuses actions or parameters that are not present in the saved help contract. |
+| Make retry behavior part of the design. | `503` and `429` responses are handled with retry and rate-limit waiting logic. |
+| Persist request and response artifacts. | Masked logs and reports under `data/L5_railway/output/` make the multi-call workflow auditable. |
+| Skip the model when code is clearer. | This task is solved with deterministic Python because no ambiguous language or perception step is needed. |
+
+The practical pattern to remember:
+
+```text
+saved API contract -> validation -> deterministic action plan -> guarded API calls -> masked audit log
+```

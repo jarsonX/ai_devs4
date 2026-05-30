@@ -18,6 +18,7 @@
 - [LLM Checklist Review](#llm-checklist-review)
 - [LLM Design Reviews](#llm-design-reviews)
 - [Reference Alignment](#reference-alignment)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -630,3 +631,25 @@ How they influenced the design:
 - deterministic rotation logic stays outside the model,
 - model output is validated before it can drive hub requests,
 - the future agent should use compact tools with clear response contracts instead of raw free-form actions.
+
+## What This Task Should Teach
+
+This task is mainly about separating visual perception from deterministic action in an AI workflow that can affect external state.
+The important lesson is that the model should read the board, but Python should validate the board, calculate rotations, cap execution, and decide when Hub requests are allowed.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Use the model for perception only. | The vision model reads tile exits; rotation math and sequence planning stay in deterministic code. |
+| Validate visual output before acting. | Invalid coordinates, directions, confidence values, or incomplete boards stop the workflow before rotation requests. |
+| Improve inputs before changing prompts. | Board-rectangle isolation and inner tile crops fixed major parsing problems before model choice became the main issue. |
+| Compare models on the real task. | Guarded runs showed that `gpt-5.5` was stable enough while cheaper models were not yet reliable here. |
+| Freeze diagnostics for debugging. | Per-run snapshots make it possible to inspect `before`, `solved_reference`, and `after` parser behavior. |
+| Guard external side effects. | Rotation requests are capped, logged, and followed by refreshed-board verification. |
+
+The practical pattern to remember:
+
+```text
+image -> deterministic preprocessing -> narrow vision parse -> schema validation -> deterministic solver -> guarded rotations
+```

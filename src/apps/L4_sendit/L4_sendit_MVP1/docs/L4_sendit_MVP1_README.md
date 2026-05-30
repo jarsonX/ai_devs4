@@ -17,6 +17,7 @@
 - [Run](#run)
 - [Main Modules](#main-modules)
 - [Verification](#verification)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -243,3 +244,25 @@ Local verification should run before any Hub submission:
 10. Confirm that `run_report.md` explains decisions, closed-route reasoning, and the resolved `WDP` uncertainty.
 
 Hub verification should be explicit and guarded by `--submit`. MVP1 has been submitted successfully; the Hub accepted the generated declaration.
+
+## What This Task Should Teach
+
+This task is mainly about making a deterministic baseline before adding AI to a document workflow.
+The important lesson is that a simple, visible pipeline can teach the domain rules, evidence needs, validation checks, and output contract before the model is introduced.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Build the boring version first. | MVP1 uses explicit known facts and plain Python instead of agents, OCR, or model calls. |
+| Make intermediate state inspectable. | Parsed command data, extracted facts, declaration data, final text, and run reports are saved under `data/L4_sendit/output/`. |
+| Preserve reasoning about domain rules. | The closed-route rule and category decision are documented instead of hidden inside the final declaration. |
+| Validate before submission. | Local checks confirm required fields, route handling, amount, wagon count, and template formatting before `--submit`. |
+| Keep external actions explicit. | Hub submission runs only when the command-line user passes `--submit`. |
+| Use MVP1 as the comparison point for AI work. | Later AI-assisted versions can be judged against this deterministic baseline. |
+
+The practical pattern to remember:
+
+```text
+known command -> explicit facts -> deterministic rendering -> local validation -> guarded submission
+```

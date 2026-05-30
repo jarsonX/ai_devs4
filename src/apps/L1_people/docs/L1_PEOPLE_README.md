@@ -11,6 +11,7 @@ L1 People solves the AI_devs `people` task. The app downloads people data from t
 - [Main Modules](#main-modules)
 - [Required Configuration](#required-configuration)
 - [Run](#run)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -62,4 +63,25 @@ From the repository root, use the project virtual environment:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L1_people.main
+```
+
+## What This Task Should Teach
+
+This task is mainly about building a small hybrid pipeline where code narrows the problem before the model is asked to judge anything.
+The useful habit is to make the model handle only the part that benefits from language understanding, while Python owns data loading, filtering, output shaping, and verification.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Filter before asking the model. | Deterministic filters reduce the people dataset by gender, birth place, and age range before job classification. |
+| Keep model work narrow. | OpenAI classifies only the remaining candidate jobs into a fixed tag list. |
+| Prefer structured model output. | The classifier response is parsed as structured data so the pipeline can select transport-related people reliably. |
+| Persist useful run artifacts. | The verification payload, response, and statistics are saved under `data/L1_people/output/` for later inspection. |
+| Keep secrets in configuration. | API keys and endpoint values come from `.env`, not from source code or documentation. |
+
+The practical pattern to remember:
+
+```text
+raw dataset -> deterministic filtering -> narrow model classification -> structured selection -> verification payload
 ```

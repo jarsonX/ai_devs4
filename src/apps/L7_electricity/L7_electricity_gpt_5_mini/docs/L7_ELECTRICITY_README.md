@@ -17,6 +17,7 @@
 - [Assumptions And Risks](#assumptions-and-risks)
 - [LLM Design Reviews](#llm-design-reviews)
 - [Reference Alignment](#reference-alignment)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -269,3 +270,25 @@ The key difference is not the course goal, but the engineering trade-off preserv
 
 - accept more deterministic support work,
 - in exchange for a chance to make `gpt-5-mini` good enough for the same task.
+
+## What This Task Should Teach
+
+This task is mainly about learning from an experiment that is paused rather than successful.
+The important lesson is that a cheaper model can require more deterministic scaffolding, more diagnostics, and clearer acceptance criteria before it becomes a good default.
+
+Key learning points:
+
+| Lesson | What it means in this track |
+|---|---|
+| Preserve experimental context. | The README keeps the `gpt-5-mini` design snapshot so work can resume without rediscovering the same constraints. |
+| Reduce the model's job before retrying. | The planned direction removes solved-board parsing and asks the model to parse only the current board. |
+| Use deterministic support to make perception easier. | Solved reference maps, tile crops, regression harnesses, and post-rotation checks narrow the vision problem. |
+| Define stability before switching models. | The mini track should become active only after guarded comparisons show reliable enough parsing. |
+| Treat diagnostics as product work. | Frozen tile crops and benchmark cases are part of the learning path, not optional cleanup. |
+| Accept that cheaper is not always simpler. | Cost savings may be worth it only if the added engineering complexity stays manageable. |
+
+The practical pattern to remember:
+
+```text
+paused experiment -> known failure modes -> deterministic supports -> guarded comparison -> resume or stop deliberately
+```

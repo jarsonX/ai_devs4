@@ -10,6 +10,7 @@ This app solves the AI_devs `findhim` task using an agent with OpenAI Function C
   - [What it does](#what-it-does)
   - [Main modules](#main-modules)
   - [Notes](#notes)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ### What it does
 
@@ -38,3 +39,24 @@ This app solves the AI_devs `findhim` task using an agent with OpenAI Function C
 - The agent orchestrates the workflow in stages (`setup`, `ranking`, `finalize`) and only sees the tools needed in the current stage.
 - Calculations and API handling stay deterministic in Python.
 - `workbench/` contains exploration scripts used during development.
+
+## What This Task Should Teach
+
+This task is mainly about using an agent as an orchestrator without letting it own the whole solution.
+The important lesson is that Function Calling works best when tools are small, stage-specific, and backed by deterministic code that can validate the result.
+
+Key learning points:
+
+| Lesson | What it means in this app |
+|---|---|
+| Stage the agent workflow. | The app separates setup, candidate ranking, and finalization so each stage has a clear job. |
+| Expose only useful tools. | The agent sees tools needed for the current stage instead of a large all-purpose toolbox. |
+| Keep math out of model reasoning. | Haversine distance calculations are done in Python, not improvised by the model. |
+| Use the model where ambiguity exists. | OpenAI helps resolve approximate city coordinates, while API calls and validation remain deterministic. |
+| Preserve exploration without mixing it into runtime. | `workbench/` scripts document investigation steps without becoming part of the production path. |
+
+The practical pattern to remember:
+
+```text
+staged agent -> narrow tools -> deterministic ranking -> validated final answer
+```

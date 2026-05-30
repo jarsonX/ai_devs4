@@ -5,6 +5,7 @@
 - [Purpose](#purpose)
 - [Approach](#approach)
 - [Current State](#current-state)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -30,3 +31,24 @@ Because of that, this directory keeps two documented tracks with different statu
 
 - `L7_electricity_gpt_5_5/` for the working application version,
 - `L7_electricity_gpt_5_mini/` for the paused experiment and design notes for a possible future return to `gpt-5-mini`.
+
+## What This Task Should Teach
+
+This directory is mainly about comparing solution tracks for the same AI workflow rather than treating the first model choice as final.
+The important lesson is to separate the durable architecture from the model experiment: perception can change, but deterministic solving and guarded Hub interaction should stay stable.
+
+Key learning points:
+
+| Lesson | What it means in this directory |
+|---|---|
+| Keep working and experimental tracks explicit. | `L7_electricity_gpt_5_5/` holds the verified solution, while `L7_electricity_gpt_5_mini/` preserves the paused cheaper-model experiment. |
+| Separate perception from solving. | Vision parsing reads the board, but ordinary code computes tile rotations. |
+| Let evidence choose the model. | The stronger model became the active version because real guarded runs showed better stability. |
+| Preserve failed or paused experiments usefully. | The mini track keeps design notes so future work can resume from known trade-offs instead of starting over. |
+| Treat cost as a design pressure, not the only goal. | A cheaper model is valuable only if added deterministic support can make the workflow reliable enough. |
+
+The practical pattern to remember:
+
+```text
+stable architecture -> model comparison -> verified track -> preserved experiment notes
+```
