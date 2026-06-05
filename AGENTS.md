@@ -12,14 +12,20 @@
 
 ## Safety Boundaries
 
-- Never place secrets in source code, documentation, notes, markdown files, commit messages, logs, or app data files.
-- Treat course FLAGS, task completion answers, and challenge verification outputs as secrets. Never place them in source code, documentation, notes, markdown files, commit messages, logs, or app data files.
-- Treat API URLs, API keys, tokens, credentials, internal endpoints, and similar operational values as secrets unless the user explicitly says otherwise.
-- Store secrets only in `.env` files or other dedicated secret stores approved by the user.
-- Outside `.env`, use masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
+- A secret is any value that can cause harm if exposed, such as an API key, token, credential, private endpoint, internal operational URL, or value that grants access to a paid service, private system, or external automation surface.
+- Store secrets only in `.env` files. Never place secrets in source code, documentation, notes, markdown files, commit messages, logs, reports, or app data files.
+- Outside `.env`, refer to secrets and operational endpoints by masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - Treat files listed in `.gitignore` as potentially secret-bearing and handle them with extra caution.
+- Course API feedback, task input data, retrieved records, mailbox contents, extracted candidate values, Hub feedback, FLAGS, final answers, challenge verification outputs, and debugging observations are local learning artifacts, not secrets by default.
+- Local learning artifacts may be stored in ignored runtime data, such as `data/{APP_NAME}/...`, when useful for debugging and learning.
+- Do not place local learning artifacts in source code, documentation, notes, markdown files, commit messages, or published artifacts.
+- If a local learning artifact contains a real secret or credential that grants external access, pause work and inform the user.
+- Do not treat every configuration value as a secret. Model names, iteration limits, request limits, batch sizes, and timeouts are regular app configuration, not secrets.
+- Prefer regular app-level constants in `src/apps/{APP_NAME}/config.py` for model names, guard limits, batch sizes, and timeouts. Use environment variables for secrets, externally supplied operational values such as approved endpoint URLs, or explicitly designed runtime overrides.
+- Use OpenAI models for LLM workflows unless the user explicitly approves another provider for the specific app or experiment.
 - Ask for approval before code changes, architecture changes, external API calls, dependency installation, destructive commands, or scope expansion.
-- Before implementing a new or materially changed LLM-powered workflow, follow `_agent/instructions/llm_design_gate.md`.
+- Before implementing an app that uses or may use an LLM workflow, make sure the app README has an `LLM Usage And Reviews` section and follow `_agent/instructions/llm_design_gate.md`.
+- After completing an LLM-powered app or materially changed LLM workflow, review it with `_agent/instructions/llm_optimization_checklist.md` and record the result in the app README before declaring the work complete.
 
 ## Coding Defaults
 

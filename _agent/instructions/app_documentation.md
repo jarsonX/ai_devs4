@@ -20,17 +20,44 @@ A README should usually include these sections:
 - `Purpose`: what the app is for and what learning or business problem it solves.
 - `Workflow`: the main runtime flow, preferably as ordered steps.
 - `Mermaid Logic Flow`: a Mermaid flowchart that shows the app's main decision and data flow. Every app README should include this section unless a flowchart would be misleading, harmful, or not recommended for the specific situation.
+- `LLM Usage And Reviews`: whether the app uses or may use LLMs, and the status of required LLM design and optimization reviews.
 - `Configuration`: required environment variables and important runtime settings, without real secret values.
 - `Run`: the command or entrypoint used to run the app.
 - `Main Modules`: the main files/modules and their responsibilities.
 - `Verification`: the simplest practical way to check that the app works.
 - `What This Task Should Teach`: required final section added when work on the app is complete. It should explain the main learning points of the task, using concrete lessons from the implemented app. This section must be the last section in the README.
 
-README may include additional sections when useful, such as `HTTP Contract`, `Tool Strategy`, `Data Flow`, `Model Role`, `Limitations`, `Assumptions`, `LLM Design Reviews`, or `Troubleshooting`.
+README may include additional sections when useful, such as `HTTP Contract`, `Tool Strategy`, `Data Flow`, `Model Role`, `Limitations`, `Assumptions`, or `Troubleshooting`.
 
 If creating the Mermaid flowchart would be misleading, harmful, or not recommended for the specific situation, stop before omitting it. Explain the reason to the user and ask whether the app README may skip the Mermaid flowchart.
 
-For LLM apps, README is the source of truth for the accepted design, approved scope, and runnable contract. If checklist evidence or trade-off notes become too detailed, summarize the result in README and move the detailed reasoning to DEV_NOTES.
+## LLM Usage And Reviews
+
+Every new app README must include an `LLM Usage And Reviews` section, even when the app does not use an LLM. When updating an existing app README that does not have this section, add it before continuing with app implementation or completion work. This section is the local source of truth for whether LLMs are planned, whether implementation may start, and whether the completed LLM workflow has been reviewed.
+
+Use this minimum structure:
+
+```md
+## LLM Usage And Reviews
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| LLM usage | Yes / No / Undecided | Short reason based on the planned workflow. |
+| Design review | Pending / Passed / N/A | `_agent/instructions/llm_design_checklist.md`, scope, date, and result. |
+| Optimization review | Pending / Passed / N/A | `_agent/instructions/llm_optimization_checklist.md`, scope, mode, date, and result. |
+```
+
+Set `LLM usage` to:
+
+- `Yes` when the app includes or is expected to include a model call, prompt, tool-using model step, agent behavior, multimodal extraction, model output schema, or AI-assisted reasoning component.
+- `Undecided` when the app may need an LLM but the design is not yet settled.
+- `No` only when the app is expected to stay deterministic.
+
+If `LLM usage` is `Yes` or `Undecided`, do not start source implementation for the app until the design review has passed. Discovery, reference reading, approved read-only API inspection, README design notes, and DEV_NOTES are allowed before the review. Application source modules, prompts, model-call scaffolding, agent-loop scaffolding, model tools, and runtime workflow code are not allowed before the review passes.
+
+For LLM apps, README is the source of truth for the accepted design, approved scope, runnable contract, and LLM review status. If checklist evidence or trade-off notes become too detailed, summarize the result in README and move the detailed reasoning to DEV_NOTES.
+
+After completing an LLM-powered app or materially changed LLM workflow, review the completed app with `_agent/instructions/llm_optimization_checklist.md` before declaring the work complete. Record the result in `LLM Usage And Reviews`. Any `NO` item should be listed as a blocking fix, accepted workbench limitation, or follow-up before production.
 
 ## README Writing Style
 

@@ -17,6 +17,22 @@ For every item, add a short evidence note:
 - mention the file, component, workflow step, metric, or behavior that supports the answer,
 - do not answer with `YES`, `NO`, or `N/A` alone.
 
+After the review, record the result in the app README `LLM Usage And Reviews` section. The record must mention `_agent/instructions/llm_optimization_checklist.md`, review scope, review mode, date, result, and any follow-up classification.
+
+Use this standard evidence format inside the existing `LLM Usage And Reviews` table or directly below it:
+
+```md
+| Optimization review | Passed | `_agent/instructions/llm_optimization_checklist.md`; YYYY-MM-DD; scope: full workbench workflow; mode: non-production; result: PASS; follow-up: no blocking changes. |
+```
+
+Any `NO` item should be classified as one of:
+
+- `blocking fix`,
+- `accepted workbench limitation`,
+- `follow-up before production`.
+
+Do not declare an LLM-powered app or materially changed LLM workflow complete until this review is recorded, unless the user explicitly pauses the work before completion.
+
 ## 1. Task Design
 
 - [ ] The app solves a clearly defined task with a concrete expected output.
