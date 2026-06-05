@@ -19,6 +19,7 @@ A README should usually include these sections:
 
 - `Purpose`: what the app is for and what learning or business problem it solves.
 - `Workflow`: the main runtime flow, preferably as ordered steps.
+- `Mermaid Logic Flow`: a Mermaid flowchart that shows the app's main decision and data flow. Every app README should include this section unless a flowchart would be misleading, harmful, or not recommended for the specific situation.
 - `Configuration`: required environment variables and important runtime settings, without real secret values.
 - `Run`: the command or entrypoint used to run the app.
 - `Main Modules`: the main files/modules and their responsibilities.
@@ -26,6 +27,8 @@ A README should usually include these sections:
 - `What This Task Should Teach`: required final section added when work on the app is complete. It should explain the main learning points of the task, using concrete lessons from the implemented app. This section must be the last section in the README.
 
 README may include additional sections when useful, such as `HTTP Contract`, `Tool Strategy`, `Data Flow`, `Model Role`, `Limitations`, `Assumptions`, `LLM Design Reviews`, or `Troubleshooting`.
+
+If creating the Mermaid flowchart would be misleading, harmful, or not recommended for the specific situation, stop before omitting it. Explain the reason to the user and ask whether the app README may skip the Mermaid flowchart.
 
 For LLM apps, README is the source of truth for the accepted design, approved scope, and runnable contract. If checklist evidence or trade-off notes become too detailed, summarize the result in README and move the detailed reasoning to DEV_NOTES.
 
