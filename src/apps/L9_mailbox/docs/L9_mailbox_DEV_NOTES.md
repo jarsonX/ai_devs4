@@ -116,7 +116,7 @@ Step 5 verification:
 
 Step 6 completed on 2026-06-05. `extractor.py` now performs deterministic structured extraction from fetched message payloads. It extracts candidate `date`, `password`, and `confirmation_code` values in memory, keeps message IDs as evidence, builds a `MailboxAnswer`, runs local validation, and records uncertainties such as missing or multiple candidate values. This step did not add an LLM call.
 
-Extraction output currently has two report modes because earlier design separated storage-safe reports from human debug views. With the updated repository policy, ignored runtime reports may include course API feedback, candidate values, final answers, Hub feedback, and FLAGS when useful for debugging. Future cleanup may simplify this split, but API keys, operational endpoints, and credentials that grant real external access must still stay out of files.
+Extraction output currently exposes a masked report and a value-bearing report. The debug view is a thin wrapper around the value-bearing report that adds a storage warning. With the updated repository policy, ignored runtime reports may include course API feedback, candidate values, final answers, Hub feedback, and FLAGS when useful for debugging. API keys, operational endpoints, and credentials that grant real external access must still stay out of files.
 
 Step 6 verification:
 
@@ -126,7 +126,60 @@ Step 6 verification:
 - local validation accepted the complete fake answer,
 - the debug extraction view exposed fake candidate values for human inspection.
 
-Current next step: implement Step 7 only.
+Step 7 completed on 2026-06-05. The app now includes a bounded `Mailbox Investigator` loop with narrow mailbox tools and a local report writer. The model uses OpenAI Responses API function tools to choose mailbox actions one turn at a time, while deterministic code still owns payload validation, candidate extraction, answer validation, and the final `finish` guard. The loop can stop as `solved`, `partial`, or `blocked`, and it falls back to a deterministic blocked result when the model fails to produce a valid finish payload before the iteration guard.
+
+Step 7 implementation details:
+
+- `tools.py` now defines narrow agent tools for `search_messages`, `get_thread`, `get_messages`, `propose_answer`, and `finish`,
+- the toolbox caches fetched messages in memory so repeated reads can reuse existing payloads during one bounded run,
+- `finish` is validated by code, not trusted directly from the model,
+- solved values must be grounded in fetched message text before the loop can stop as `solved`,
+- `report_writer.py` writes a local JSON report with guard counters and runtime summary under `data/L9_mailbox/output/run_report.json`.
+
+Step 7 verification:
+
+- `tests.L9_mailbox.test_agent_loop` passed locally with a fake OpenAI client and a fake read-only mailbox client,
+- the fake solved run searched, fetched, proposed an answer, finished as `solved`, and wrote a report,
+- the fake blocked run exhausted the iteration guard and stopped as `blocked`,
+- the report captured visible counters for iterations, model calls, and tool calls,
+- no real OpenAI or zmail API call was needed for this Step 7 verification.
+
+Step 8 completed on 2026-06-05. The app now includes guarded Hub submission behind an explicit CLI flag. Submission is available only when `main.py` is started with `--workbench --submit`, the answer is locally valid, the values are grounded in fetched message text, and the per-run submit guard still has remaining budget.
+
+Step 8 implementation details:
+
+- `hub_client.py` now builds mailbox verify payloads, masks API keys for reports, and enforces a bounded submit guard,
+- `tools.py` now exposes `submit_answer` only in submission mode,
+- `finish` cannot stop as `solved` in submission mode until an accepted Hub submission happens,
+- `agent.py` now passes submission mode into the prompt, tool list, and toolbox,
+- `main.py` now provides the workbench CLI with optional `--submit`.
+
+Step 8 verification:
+
+- `tests.L9_mailbox.test_agent_loop` passed locally with fake OpenAI, fake mailbox, and fake Hub clients,
+- the fake submit run searched, fetched, proposed an answer, submitted it through `submit_answer`, and finished as `solved`,
+- the fake guard test confirmed that submission mode cannot finish as `solved` before an accepted submit,
+- no real OpenAI, zmail, or Hub request was made during Step 8 verification.
+
+Step 9 completed on 2026-06-05. The app now includes a deterministic recovery pass and durable value-bearing runtime archives, and the first live `--workbench --submit` run solved the task without manual answer assembly.
+
+Step 9 implementation details:
+
+- `extractor.py` now gives higher priority to explicit confirmation-code corrections and multiline password patterns so the final proposal prefers corrected evidence over earlier broken values,
+- `tools.py` now exposes deterministic recovery helpers that can expand suspicious threads, rerun targeted searches, rebuild an answer from the whole cached message corpus, and persist a full fetched-message archive,
+- `report_writer.py` now writes both `run_report.json` and `fetched_messages.json` under `data/L9_mailbox/output/`,
+- `agent.py` now tries deterministic recovery before ending as `partial` or `blocked`, and in submission mode it can submit the recovered answer without human intervention,
+- the live run report now stores Hub feedback and the returned FLAG under ignored runtime data, which matches the repository learning-artifact policy.
+
+Step 9 verification:
+
+- `tests.L9_mailbox.test_agent_loop` passed locally with six tests after the recovery and persistence changes,
+- the new recovery test confirmed that a weak model path can still solve the fake mailbox, submit through the fake Hub client, and persist full fetched messages,
+- the real command `.\venv\Scripts\python.exe -m src.apps.L9_mailbox.main --workbench --submit --print-config` finished as `solved`,
+- `data/L9_mailbox/output/run_report.json` now contains the returned Hub flag and raw submission feedback,
+- `data/L9_mailbox/output/fetched_messages.json` now contains the full fetched message bodies used during the solved run.
+
+Current next step: optional prompt and retrieval cleanup to reduce live iteration count, not a functional blocker.
 
 ## Lessons Learned
 

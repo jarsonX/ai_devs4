@@ -22,6 +22,16 @@ PASSWORD_PATTERNS = (
     re.compile(r"\bpass\s*[:=]\s*([^\s,;]+)", re.IGNORECASE),
     re.compile(r"\bhaslo\s*[:=]\s*([^\s,;]+)", re.IGNORECASE),
     re.compile(r"\bhas\u0142o\s*[:=]\s*([^\s,;]+)", re.IGNORECASE),
+    re.compile(r"\bhas\u0142em\s*[:=]\s*([^\s,;]+)", re.IGNORECASE),
+    re.compile(r"\bhaslem\s*[:=]\s*([^\s,;]+)", re.IGNORECASE),
+)
+PASSWORD_LABEL_PATTERN = re.compile(
+    r"\b(password|pass|haslo|has\u0142o|haslem|has\u0142em)\b",
+    re.IGNORECASE,
+)
+CONFIRMATION_CORRECTION_PATTERN = re.compile(
+    r"\b(poprawny|correct|corrected|fixed|zly|z\u0142y|wrong)\b",
+    re.IGNORECASE,
 )
 TEXT_FIELDS = (
     "body",
@@ -42,6 +52,7 @@ class ExtractedCandidate:
     value: str
     message_id: int | str | None
     reason: str
+    priority: int = 0
 
 
 # Store structured extraction output for later validation and synthesis.
@@ -90,6 +101,55 @@ def extract_message_records(payload: Any) -> list[Mapping[str, Any]]:
     return [payload]
 
 
+# Extract password candidates that appear on the next non-empty line after a password label.
+def extract_multiline_password_candidates(
+    text: str,
+    *,
+    message_id: int | str | None,
+) -> list[ExtractedCandidate]:
+    candidates: list[ExtractedCandidate] = []
+    lines = text.splitlines()
+
+    for index, line in enumerate(lines):
+        if not PASSWORD_LABEL_PATTERN.search(line):
+            continue
+
+        stripped_line = line.strip()
+        if ":" not in stripped_line and "=" not in stripped_line:
+            continue
+
+        for next_index in range(index + 1, len(lines)):
+            next_line = lines[next_index].strip()
+            if not next_line:
+                continue
+
+            value = next_line.split()[0].strip(",;")
+            if is_valid_password(value):
+                candidates.append(
+                    ExtractedCandidate(
+                        field="password",
+                        value=value,
+                        message_id=message_id,
+                        reason="password value found on the next line after a password label",
+                        priority=10,
+                    )
+                )
+            break
+
+    return candidates
+
+
+# Score confirmation-code candidates so corrected codes beat earlier incorrect variants.
+def get_confirmation_code_priority(text: str, match_start: int, match_end: int) -> int:
+    local_context = text[max(0, match_start - 60) : min(len(text), match_end + 60)]
+    if CONFIRMATION_CORRECTION_PATTERN.search(local_context):
+        if re.search(r"\b(poprawny|correct|corrected|fixed)\b", local_context, re.IGNORECASE):
+            return 10
+        if re.search(r"\b(zly|z\u0142y|wrong)\b", local_context, re.IGNORECASE):
+            return -5
+    return 0
+
+
 # Extract all syntactic candidates from one fetched message body.
 def extract_candidates_from_message(message: Mapping[str, Any]) -> tuple[ExtractedCandidate, ...]:
     message_id = get_message_identifier(message)
@@ -105,6 +165,7 @@ def extract_candidates_from_message(message: Mapping[str, Any]) -> tuple[Extract
                     value=value,
                     message_id=message_id,
                     reason="valid YYYY-MM-DD date found in message text",
+                    priority=0,
                 )
             )
 
@@ -117,6 +178,7 @@ def extract_candidates_from_message(message: Mapping[str, Any]) -> tuple[Extract
                     value=value,
                     message_id=message_id,
                     reason="SEC confirmation code pattern found in message text",
+                    priority=get_confirmation_code_priority(text, match.start(), match.end()),
                 )
             )
 
@@ -130,10 +192,28 @@ def extract_candidates_from_message(message: Mapping[str, Any]) -> tuple[Extract
                         value=value,
                         message_id=message_id,
                         reason="password-like label found in message text",
+                        priority=5,
                     )
                 )
 
+    candidates.extend(
+        extract_multiline_password_candidates(
+            text,
+            message_id=message_id,
+        )
+    )
+
     return tuple(candidates)
+
+
+# Pick the best candidate for one field using explicit priority, then stable appearance order.
+def select_best_candidate(field_candidates: Sequence[ExtractedCandidate]) -> ExtractedCandidate | None:
+    if not field_candidates:
+        return None
+    return max(
+        enumerate(field_candidates),
+        key=lambda item: (item[1].priority, -item[0]),
+    )[1]
 
 
 # Pick the first candidate for each required field and keep ambiguity visible.
@@ -156,15 +236,15 @@ def build_proposed_answer(candidates: Sequence[ExtractedCandidate]) -> tuple[Mai
         elif len(unique_values) > 1:
             uncertainties.append(f"{field_name} has multiple candidate values")
 
+    best_password = select_best_candidate(values_by_field["password"])
+    best_date = select_best_candidate(values_by_field["date"])
+    best_confirmation_code = select_best_candidate(values_by_field["confirmation_code"])
+
     return (
         MailboxAnswer(
-            password=values_by_field["password"][0].value if values_by_field["password"] else None,
-            date=values_by_field["date"][0].value if values_by_field["date"] else None,
-            confirmation_code=(
-                values_by_field["confirmation_code"][0].value
-                if values_by_field["confirmation_code"]
-                else None
-            ),
+            password=best_password.value if best_password else None,
+            date=best_date.value if best_date else None,
+            confirmation_code=best_confirmation_code.value if best_confirmation_code else None,
         ),
         tuple(uncertainties),
     )
@@ -199,6 +279,7 @@ def build_extraction_report(result: ExtractionResult) -> dict[str, Any]:
                 "value": candidate.value,
                 "message_id": candidate.message_id,
                 "reason": candidate.reason,
+                "priority": candidate.priority,
             }
             for candidate in result.candidates
         ],
@@ -222,6 +303,7 @@ def build_masked_extraction_report(result: ExtractionResult) -> dict[str, Any]:
                 "has_value": bool(candidate.value),
                 "message_id": candidate.message_id,
                 "reason": candidate.reason,
+                "priority": candidate.priority,
             }
             for candidate in result.candidates
         ],
