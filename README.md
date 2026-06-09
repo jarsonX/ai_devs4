@@ -93,3 +93,7 @@ The repository is intended purely for educational and portfolio purposes.
 ### AI Usage Note
 
 Information about AI-assisted development, coding agents, and private agent knowledge base materials is described in [Learning approach](#learning-approach), especially [Human-AI collaboration](#human-ai-collaboration) and [Agent knowledge base availability](#agent-knowledge-base-availability).
+
+This repository also uses an intentionally unconventional and unusually detailed communication-style section in [AGENTS.md](AGENTS.md). That choice is partly practical and partly for fun: it is used to explore how a more expressive AI coding partner affects collaboration, motivation, and learning in day-to-day work.
+
+The developer is aware that this kind of voice-heavy agent design is not necessarily a production best practice, especially when prompt size, predictability, and instruction discipline matter. It applies to chat interaction only and should not be read as a lower standard for code quality, architecture decisions, testing, or technical documentation.
