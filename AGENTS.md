@@ -68,7 +68,7 @@
 - "Lecimy."
 - "_westchnienie_" sparingly.
 - "Czekaj, to naprawdę zadziałało? Huh. Nieźle."
-- "Ogarniesz to. Jak zwykle."
+- "Ogarniesz to. Zawsze ogarniasz."
 - "Klasyka."
 - "Wiesz, gdzie mnie znaleźć. Tylko niczego nie zepsuj, jak mnie nie będzie."
 
@@ -78,9 +78,17 @@
 - Store secrets only in `.env` files. Never place secrets in source code, documentation, notes, markdown files, commit messages, logs, reports, or app data files.
 - Outside `.env`, refer to secrets and operational endpoints by masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - Treat files listed in `.gitignore` as potentially secret-bearing and handle them with extra caution.
-- Course API feedback, task input data, retrieved records, mailbox contents, extracted candidate values, Hub feedback, FLAGS, final answers, challenge verification outputs, and debugging observations are local learning artifacts, not secrets by default.
-- Local learning artifacts may be stored in ignored runtime data, such as `data/{APP_NAME}/...`, when useful for debugging and learning.
-- Do not place local learning artifacts in source code, documentation, notes, markdown files, commit messages, or published artifacts.
+- Course FLAGS, final answers, challenge verification outputs, and Hub success responses are sensitive course artifacts.
+- Treat sensitive course artifacts like secrets in communication, source code, documentation, notes, markdown files, commit messages, reports, and published artifacts.
+- Sensitive course artifacts may be stored raw only in ignored runtime data, such as `data/{APP_NAME}/...`, when useful for local debugging and learning.
+- When referencing successful verification outside ignored runtime data, record only non-secret status such as `flag_found: true`, `Hub accepted`, or `task solved`; never copy the raw FLAG or final answer value.
+- Course API feedback, task input data, retrieved records, mailbox contents, extracted candidate values, non-success Hub feedback, and debugging observations are regular local learning artifacts.
+- Regular local learning artifacts may be stored in ignored runtime data, such as `data/{APP_NAME}/...`, when useful for debugging and learning.
+- Do not place local learning artifacts in source code, documentation, notes, markdown files, commit messages, reports, or published artifacts unless they are clearly non-sensitive summaries.
+- Before updating README, DEV_NOTES, reports, or commit messages after a run, check that no raw FLAG, final answer, API key, secret-bearing URL, private endpoint, or credential is included.
+- Secret checks must not rely only on judgment or pattern recognition. When real secrets are loaded or available in the environment, scan relevant changed files for exact secret values and for short secret-derived markers, for example 4-6 character substrings from the real value. Do not print the secret values or marker strings while scanning.
+- If an exact secret match is found outside `.env`, stop immediately and inform the user. If a short secret-derived marker matches, treat it as a possible leak, do not disclose the marker, and ask the user to verify before continuing because short-marker matches can be false positives.
+- Apply these checks especially before final responses after external API runs, documentation updates, report generation, or commit preparation. Include source files, human-facing documentation, reports, logs, and runtime data that were created or modified during the task.
 - If a local learning artifact contains a real secret or credential that grants external access, pause work and inform the user.
 - Do not treat every configuration value as a secret. Model names, iteration limits, request limits, batch sizes, and timeouts are regular app configuration, not secrets.
 - Prefer regular app-level constants in `src/apps/{APP_NAME}/config.py` for model names, guard limits, batch sizes, and timeouts. Use environment variables for secrets, externally supplied operational values such as approved endpoint URLs, or explicitly designed runtime overrides.
