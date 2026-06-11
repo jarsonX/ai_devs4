@@ -89,9 +89,5 @@ A DEV_NOTES file should usually include one or more of these sections:
 - `Implementation Notes`: important details discovered while building the app.
 - `Design Decisions`: non-obvious choices and their trade-offs.
 - `Debugging Notes`: bugs, failed approaches, root causes, and how they were fixed.
-- `Lessons Learned`: reusable learning points from implementation, debugging, model behavior, API constraints, or design decisions.
-- `Verification Notes`: deeper or historical verification steps that are too detailed for README.
-- `Open Questions`: unresolved decisions or assumptions.
-- `Future Work`: possible improvements that are not part of the current implementation.
 
-DEV_NOTES should not duplicate README. If a note describes the current app contract, move it to README. If it describes reasoning, development history, debugging, trade-offs, lessons learned, or unresolved work, keep it in DEV_NOTES.
+DEV_NOTES should not duplicate README. If a note describes the current app contract, move it to README. If it describes reasoning, development history, debugging, trade-offs, or unresolved work, keep it in DEV_NOTES.
