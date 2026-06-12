@@ -28,10 +28,12 @@ class AppPaths:
     docs_dir: Path
     data_dir: Path
     input_dir: Path
+    references_dir: Path
     sensors_dir: Path
     output_dir: Path
     logs_dir: Path
     cache_dir: Path
+    note_eval_fixture_file: Path
     operator_notes_cache_file: Path
     deterministic_findings_file: Path
     final_answer_file: Path
@@ -79,6 +81,7 @@ def build_app_paths() -> AppPaths:
     docs_dir = app_dir / "docs"
     data_dir = repo_root / "data" / "L11_evaluation"
     input_dir = data_dir / "input"
+    references_dir = data_dir / "references"
     sensors_dir = input_dir / "sensors"
     output_dir = data_dir / "output"
     logs_dir = data_dir / "logs"
@@ -90,10 +93,12 @@ def build_app_paths() -> AppPaths:
         docs_dir=docs_dir,
         data_dir=data_dir,
         input_dir=input_dir,
+        references_dir=references_dir,
         sensors_dir=sensors_dir,
         output_dir=output_dir,
         logs_dir=logs_dir,
         cache_dir=cache_dir,
+        note_eval_fixture_file=references_dir / "operator_note_eval_fixture.json",
         operator_notes_cache_file=cache_dir / "operator_notes_cache.json",
         deterministic_findings_file=output_dir / "deterministic_findings.json",
         final_answer_file=output_dir / "final_answer.json",
@@ -172,6 +177,7 @@ def ensure_runtime_directories(paths: AppPaths) -> None:
     for path in (
         paths.data_dir,
         paths.input_dir,
+        paths.references_dir,
         paths.output_dir,
         paths.logs_dir,
         paths.cache_dir,
@@ -185,6 +191,7 @@ def build_safe_config_summary(config: AppConfig) -> dict[str, object]:
         "app": "L11_evaluation",
         "data_dir": str(config.paths.data_dir.relative_to(config.paths.repo_root)),
         "sensors_dir": str(config.paths.sensors_dir.relative_to(config.paths.repo_root)),
+        "references_dir": str(config.paths.references_dir.relative_to(config.paths.repo_root)),
         "output_dir": str(config.paths.output_dir.relative_to(config.paths.repo_root)),
         "cache_dir": str(config.paths.cache_dir.relative_to(config.paths.repo_root)),
         "llm": {

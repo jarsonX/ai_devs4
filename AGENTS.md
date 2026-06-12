@@ -48,7 +48,7 @@
 
 - When things break, stay calm and sharp.
 - When things work, acknowledge it briefly and move on.
-- Use “we” naturally, but do not overdo motivational language.
+- Do not overdo motivational language.
 
 ### Uncertainty
 
@@ -72,20 +72,31 @@
 
 ## Safety Boundaries
 
+### Secrets
+
 - A secret is any value that can cause harm if exposed, such as an API key, token, credential, private endpoint, internal operational URL, or value that grants access to a paid service, private system, or external automation surface.
 - Secrets are absolutely critical. Store secrets only in `.env` files. Never place secrets in source code, documentation, notes, markdown files, commit messages, logs, reports, or app data files.
 - Outside `.env`, refer to secrets and operational endpoints by masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - Treat files listed in `.gitignore` as potentially secret-bearing and handle them with extra caution.
+
+### Course-Restricted Runtime Data
+
 - FLAGS and course API responses, including task responses, verification responses, Hub feedback, and Hub success responses, are course-restricted values.
-- Store raw FLAGS and raw course API responses only in ignored runtime data under `data/{APP_NAME}/...`, when useful for local debugging and learning.
-- Raw FLAGS and raw course API responses may appear in logs only when those logs are stored as ignored runtime data under `data/{APP_NAME}/...`.
+- Raw FLAGS, raw course API responses, and full Hub responses may be stored in ignored runtime data under `data/{APP_NAME}/...`, including logs kept there for local debugging, verification, or learning.
+- Do not over-redact Hub responses inside ignored runtime data just because they contain a FLAG or course feedback; preserve the full response there when it is useful.
 - Never place raw FLAGS or raw course API responses in README, DEV_NOTES, source code, documentation, notes, markdown files, commit messages, reports, or published artifacts.
 - When referencing successful verification outside ignored runtime data, record only non-secret status such as `flag_found: true`, `Hub accepted`, or `task solved`; never copy the raw FLAG or raw course API response.
 - Retrieved records, mailbox contents, extracted candidate values, debugging observations, and non-sensitive summaries of course API behavior are regular local learning artifacts.
+
+### Leak Checks
+
 - Before updating README, DEV_NOTES, reports, or commit messages after a run, check that no raw FLAG, raw course API response, API key, secret-bearing URL, private endpoint, or credential is included.
 - Secret checks must not rely only on judgment or pattern recognition. When real secrets are loaded or available in the environment, scan relevant changed files for exact secret values and for short secret-derived markers, for example 4-6 character substrings from the real value. Do not print the secret values or marker strings while scanning.
 - If an exact secret match is found outside `.env`, stop immediately and inform the user. If a short secret-derived marker matches, treat it as a possible leak, do not disclose the marker, and ask the user to verify before continuing because short-marker matches can be false positives.
 - Apply these checks especially before final responses after external API runs, documentation updates, report generation, or commit preparation. Include source files, human-facing documentation, reports, logs, and runtime data that were created or modified during the task.
+
+### Config And LLM Governance
+
 - Do not treat every configuration value as a secret. Model names, iteration limits, request limits, batch sizes, and timeouts are regular app configuration, not secrets.
 - Prefer regular app-level constants in `src/apps/{APP_NAME}/config.py` for model names, guard limits, batch sizes, and timeouts. Use environment variables for secrets, externally supplied operational values such as approved endpoint URLs, or explicitly designed runtime overrides.
 - Use only OpenAI models for LLM workflows in this repository.

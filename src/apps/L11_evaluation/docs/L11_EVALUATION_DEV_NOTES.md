@@ -7,6 +7,7 @@
 - [Implementation Plan](#implementation-plan)
 - [LLM Design Review Preparation](#llm-design-review-preparation)
 - [LLM Design Checklist Review](#llm-design-checklist-review)
+- [LLM Optimization Checklist Review](#llm-optimization-checklist-review)
 - [Debugging Notes](#debugging-notes)
 - [Verification Notes](#verification-notes)
 - [Open Questions](#open-questions)
@@ -30,6 +31,13 @@ Important local references already inspected:
 | `_agent/instructions/llm_design_gate.md` | Required gate before implementing a planned LLM workflow. |
 
 No source implementation has started yet.
+
+Update on 2026-06-12:
+
+- `loader.py` now discovers JSON files in stable name order,
+- file IDs are derived from file stems such as `0001.json -> 0001`,
+- malformed JSON or non-object payloads are converted into deterministic `malformed_record` issues instead of crashing the batch,
+- loaded records preserve `raw_payload` so Step 6 can still detect missing fields or suspicious types without guessing.
 
 ## Design Decisions
 
@@ -132,6 +140,107 @@ Step 4 verification:
 - `tests.L11_evaluation.test_sensor_rules` passed with 9 tests,
 - tests covered every sensor type, every valid range boundary, out-of-range rejection, slash-separated sensor parsing, inactive field derivation, and core data model storage.
 
+Step 5 completed on 2026-06-12. `loader.py` now reads sensor JSON files, extracts `file_id`, returns normalized `SensorRecord` objects for valid JSON objects, and reports malformed files as deterministic issues.
+
+Step 5 verification:
+
+- `tests.L11_evaluation.test_loader` passed with 6 tests,
+- tests covered file discovery order, file ID extraction, valid JSON loading, wrong-type normalization with `raw_payload` preservation, malformed JSON reporting, and non-object JSON rejection,
+- loader smoke check against `data/L11_evaluation/input/sensors/` loaded `9999` records and reported `0` malformed-file issues.
+
+Step 6 completed on 2026-06-12. `deterministic_validator.py` now validates required fields, sensor-type parsing, active measurement ranges, and inactive non-zero leaks for every loaded record.
+
+Step 6 verification:
+
+- `tests.L11_evaluation.test_deterministic_validator` passed with 7 tests,
+- tests covered valid single-sensor records, active out-of-range values, inactive non-zero leaks, valid multi-sensor records, missing required fields, unknown sensor types, and batch-order preservation,
+- deterministic validation smoke check against `data/L11_evaluation/input/sensors/` processed `9999` records and found `46` invalid findings,
+- issue breakdown from the smoke check: `24` `inactive_field_non_zero`, `22` `active_value_out_of_range`, `0` missing-field findings, and `0` unknown-sensor findings in the current local dataset.
+
+Step 7 completed on 2026-06-12. `report_writer.py` now writes `deterministic_findings.json` as a stable local JSON artifact with summary counts, loader issues, and per-file deterministic findings.
+
+Step 7 verification:
+
+- `tests.L11_evaluation.test_report_writer` passed with 2 tests,
+- tests covered summary aggregation and JSON file round-trip correctness,
+- smoke write created `data/L11_evaluation/output/deterministic_findings.json`,
+- smoke write summary: `9999` records, `46` invalid findings, `46` total issues, `0` loader issues.
+
+Step 8 completed on 2026-06-12. `note_cache.py` now normalizes operator notes, maps them to stable SHA-256 hashes, loads and saves local cache entries, and identifies unique notes still missing from cache.
+
+Step 8 verification:
+
+- `tests.L11_evaluation.test_note_cache` passed with 3 tests,
+- tests covered conservative normalization, repeated-note deduplication, cache round-trip, and uncached-note detection,
+- smoke check against `data/L11_evaluation/input/sensors/` found `2032` unique normalized notes across `9999` records,
+- smoke check wrote an empty initial cache file to `data/L11_evaluation/cache/operator_notes_cache.json` because classification has not started yet.
+
+Step 9 completed on 2026-06-12. A curated fixture now lives in `data/L11_evaluation/references/operator_note_eval_fixture.json`, and `note_eval_fixture.py` loads the examples plus scores predicted labels before a full classification run.
+
+Step 9 verification:
+
+- `tests.L11_evaluation.test_note_eval_fixture` passed with 3 tests,
+- tests covered fixture loading, balanced label coverage, deterministic accuracy scoring, and case indexing,
+- smoke check loaded `9` curated examples from the committed fixture,
+- smoke check label distribution: `3` `claims_ok`, `3` `claims_error`, `3` `neutral_or_unclear`,
+- smoke check accuracy under perfect predictions: `1.0`.
+
+Step 10 completed on 2026-06-12. `note_classifier.py` now batches normalized notes, builds a structured prompt, calls the OpenAI Responses API through an injectable client, validates JSON-schema output against the current batch, and returns cache-ready classifications.
+
+Step 10 verification:
+
+- `tests.L11_evaluation.test_note_classifier` passed with 7 tests,
+- tests covered stable batching, response parsing, rejection of unknown or missing `note_id` values, fake-client batch classification, cache merging, and fixture-eval integration,
+- fake-client smoke check on the curated fixture classified `9` notes and reached `1.0` accuracy,
+- fake-client smoke check on a real-data sample classified `5` unique normalized notes without loader issues,
+- no real OpenAI call was executed yet, so this step verifies the classifier pipeline and validation path, not live prompt quality.
+
+Step 11 completed on 2026-06-12. `resolver.py` now combines deterministic findings and note classifications into final `recheck` decisions, adds contradiction issues for mismatched note claims, and refuses to guess when a file is missing note classification.
+
+Step 11 verification:
+
+- `tests.L11_evaluation.test_resolver` passed with 7 tests,
+- tests covered invalid data plus `claims_ok`, valid data plus `claims_error`, neutral notes, deterministic-only anomalies, clean valid records, sorted final answers, and missing-classification failure,
+- resolver smoke check with all notes forced to `neutral_or_unclear` produced `46` `recheck` IDs across `9999` records,
+- the neutral-note smoke result matches the deterministic anomaly count, which confirms that neutral notes do not create extra anomalies by themselves.
+
+Step 12 completed on 2026-06-12. `report_writer.py` now writes `final_answer.json` as a local non-secret payload with `task` plus `answer.recheck`, but still without any real API key.
+
+Step 12 verification:
+
+- `tests.L11_evaluation.test_report_writer` now passes with 4 tests,
+- tests cover deterministic report summary, deterministic report round-trip, final answer payload shape, and final answer JSON round-trip,
+- smoke write created `data/L11_evaluation/output/final_answer.json`,
+- smoke write summary: task `evaluation`, `46` `recheck` IDs, `0` loader issues, no API key included.
+
+Step 13 completed on 2026-06-12. `hub_client.py` now builds the real `/verify` payload from `HubConfig`, masks API keys for storage, preserves full Hub responses in ignored runtime logs, and enforces a bounded submit guard before any external request.
+
+Step 13 verification:
+
+- `tests.L11_evaluation.test_hub_client` passed with 5 tests,
+- tests covered verify payload shape, API-key masking, verify-request guard behavior, fake-session submission flow, and full runtime Hub log payloads,
+- dry smoke check built a verify payload with a fake key and `answer.recheck`,
+- dry smoke check confirmed the masked payload uses `***REDACTED***` while the runtime log payload keeps the full fake Hub response,
+- no real Hub request was executed in this step.
+
+Step 14 completed on 2026-06-12. `main.py` now wires the full workflow into `--scan` and guarded `--submit` modes, writes `deterministic_findings.json`, `final_answer.json`, `operator_notes_cache.json`, and `run_report.json`, and prints a compact JSON summary to stdout.
+
+Step 14 verification:
+
+- `tests.L11_evaluation.test_main` passed with 3 tests,
+- tests covered local scan mode, guarded submit mode with fake Hub feedback, and stdout summary shape,
+- fake-classifier scan smoke check on the real dataset processed `9999` records and `2032` unique normalized notes,
+- the same smoke run produced `46` `recheck` IDs and wrote `data/L11_evaluation/output/run_report.json`,
+- no real OpenAI or Hub network call was executed in this step.
+
+Step 15 completed on 2026-06-12. The completed MVP1 workflow was reviewed against `_agent/instructions/llm_optimization_checklist.md` in `non-production` mode, and the result was recorded in the README.
+
+Step 15 review outcome:
+
+- Result: PASS.
+- Scope: full MVP1 workflow including deterministic scan, note cache, note classifier, resolver, local artifact writing, CLI orchestration, and guarded Hub submission.
+- Follow-up: run one approved live OpenAI classification before treating the current local answer as semantically submission-ready.
+
 ## LLM Design Review Preparation
 
 Planned review mode: `non-production`.
@@ -228,9 +337,157 @@ Result: PASS. No checklist item is marked `NO`.
 | The design keeps authorization, permissions, and risky actions outside the model. | YES | API keys are loaded from `.env`; Hub submission is deterministic, explicit, guarded, and unavailable to the model. |
 | The workflow handles missing required inputs without guessing important values. | YES | Missing files, malformed records, unknown sensor types, missing fields, or invalid classifier output should become validation failures or explicit anomalies rather than guessed values. |
 
+## LLM Optimization Checklist Review
+
+Review mode: `non-production`.
+
+Review scope:
+
+```text
+full MVP1 workflow including CLI, cache, resolver, and guarded Hub submission
+```
+
+Result: PASS. No checklist item is marked `NO`.
+
+### Task Design
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| The app solves a clearly defined task with a concrete expected output. | YES | The app produces `answer.recheck`, then optionally wraps it into the guarded Hub payload in `hub_client.py`. |
+| The task is split into smaller steps when a single model call would mix multiple responsibilities. | YES | `main.py` orchestrates loader, deterministic validator, cache, classifier, resolver, report writing, and optional Hub submission as separate steps. |
+| The workflow uses deterministic code for stable logic and reserves LLM calls for language or reasoning tasks. | YES | Numeric and structural anomalies are handled in `deterministic_validator.py`; only operator-note semantics go through `note_classifier.py`. |
+| The system avoids asking the model to do multiple unrelated jobs in one step. | YES | The prompt asks only for note-label classification and confidence, never for anomaly resolution or payload construction. |
+| The workflow is simple enough to explain step by step without hidden or unnecessary branches. | YES | The README workflow and `main.py` align closely; the only branch is whether uncached notes require the classifier and whether `--submit` is enabled. |
+
+### Model Usage
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| Each LLM step has an explicit reason for using the selected model. | YES | `OperatorNoteClassifier` exists only because natural-language notes can imply correctness or error in varied wording. |
+| Stronger and more expensive models are used only in steps that require stronger reasoning or better output quality. | YES | MVP1 uses `gpt-5-mini` in `config.py` for a short classification task rather than a larger model. |
+| The app does not call the model when ordinary code, rules, or lookups would be enough. | YES | `run_scan_workflow()` executes deterministic validation first and never asks the model to inspect measurements. |
+| Repeated model calls are explained by the workflow and are not caused by avoidable retries or weak step design. | YES | Calls happen only for cache misses, are bounded by `ModelRequestGuard`, and batch unique normalized notes. |
+
+### Prompt Quality
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| Each prompt has a clear instruction, relevant context, constraints, and expected output format. | YES | `_build_input()` in `note_classifier.py` defines label meanings, ambiguity handling, note-ID constraints, and structured JSON output. |
+| Prompts include only information needed for the current step. | YES | The prompt includes only `note_id` plus normalized note text. |
+| The app avoids passing irrelevant history, data, or examples into prompts. | YES | No prior conversation, measurements, file IDs, or Hub data are sent to the model. |
+| Ambiguous user requests are clarified, transformed, or decomposed before execution. | YES | The app does not forward user free text to the model; it transforms records into narrow note-classification batches. |
+
+### Context Control
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| Only the context needed for the current step is sent to the model. | YES | `OperatorNoteBatchItem` keeps context to `note_id`, note hash, and normalized note; only `note_id` and note text go into the prompt. |
+| Old conversation history is summarized or dropped when full detail is no longer needed. | N/A | This app is a stateless batch workflow, not a multi-turn conversational system. |
+| Tool results are filtered before being added to the next model call. | YES | Deterministic findings are not inserted into prompts; only uncached normalized notes reach the classifier. |
+| The app treats context as a limited and expensive resource. | YES | Unique-note deduplication and `NOTE_BATCH_SIZE` exist specifically to cap prompt size and failure blast radius. |
+
+### Tool And Workflow Efficiency
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| The tool list exposed to the model is limited to the tools needed for the current step. | YES | No model tools are exposed at all; the classifier is a plain structured Responses API call. |
+| The workflow prefers fewer, higher-value tool calls over many small calls. | YES | One batch classifier call handles up to `NOTE_BATCH_SIZE` notes instead of one note per request. |
+| Related operations are batched when possible. | YES | `build_note_batches()` groups sorted cache misses into stable batches. |
+| Repeated external calls use caching when freshness requirements allow it. | YES | `operator_notes_cache.json` persists classifications across runs. |
+| Each workflow step has a clear purpose and there are no obvious steps that can be removed without changing the result. | YES | Removing cache, validation, resolver, or run-report writing would either increase cost or reduce traceability. |
+
+### Output Stability
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| The model returns structured output whenever the result is consumed by code. | YES | The classifier requests `json_schema` output and parses `response.output_text` as JSON. |
+| Output schemas are defined before execution. | YES | `OperatorNoteBatchPayload` and `OperatorNoteLabelPayload` define the accepted schema. |
+| Model responses are validated before they are used downstream. | YES | `parse_note_classifier_response()` and `validate_note_batch_output()` reject empty, malformed, incomplete, duplicated, or unsupported outputs. |
+| The app treats model output as untrusted input until validation passes. | YES | Cache mutation happens only after full batch validation. |
+
+### Cost And Latency
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| The number of LLM calls is intentionally minimized. | YES | Exact-note deduplication reduced `9999` records to `2032` unique notes before any live model call. |
+| The number of tool calls is intentionally minimized. | YES | The pipeline is local and linear; the only external calls are bounded model batches and at most one guarded Hub submission per run. |
+| Large prompts are avoided because they increase token usage, latency, and noise. | YES | Batch size is capped at `100`, and prompts exclude measurements and repeated note text. |
+| Model output length is intentionally controlled to avoid unnecessary tokens, latency, and downstream noise. | YES | Output is limited to one label item per note with `note_id`, `label`, and `confidence`. |
+| The app has clear places where cost, latency, retries, or token usage can be measured or logged. | YES | `run_report.json`, request guards, and batch boundaries make expensive steps visible and countable. |
+| Expensive steps are easy to identify during debugging or review. | YES | The only expensive step is note classification for uncached notes, and its trigger is explicit in `run_scan_workflow()`. |
+
+### Production Runtime Performance And Task Lifecycle
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| Production-only: Long-running LLM, tool, media generation, or agent tasks report progress or heartbeat state while work is running. | N/A | Local non-production CLI workflow. |
+| Production-only: The user can understand what is happening while waiting for slow model, tool, media generation, or agent work. | N/A | Local non-production CLI workflow. |
+| Production-only: The user can inspect partial or final artifacts during long-running work when the workflow supports it. | N/A | Local non-production CLI workflow. |
+| Production-only: Long-running work can continue safely if the user closes the browser, loses connection, or leaves the application. | N/A | No browser or persistent production task lifecycle exists here. |
+| Production-only: Task state, intermediate outputs, final results, and retry state are persisted where repeated work would be costly or fragile. | N/A | Production lifecycle is out of scope, though local cache and reports are persisted for reruns. |
+| Production-only: Tasks can be paused and resumed after errors, user approval waits, tool results, retries, or agent completion. | N/A | Not a production job system. |
+| Production-only: User interaction during long-running work is supported where relevant, such as message queueing, cancellation, or opening a separate thread. | N/A | Not relevant to this local batch workflow. |
+| Production-only: UI state is not tightly coupled to backend execution state for long-running tasks. | N/A | No UI exists. |
+| Production-only: Event-driven or job-based orchestration is used or explicitly justified where a synchronous request/response flow would be fragile. | N/A | Synchronous local batch execution is acceptable for this exercise. |
+
+### Safety And Control
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| The model is responsible for interpretation and planning, not final authorization. | YES | The model classifies note semantics only; it does not authorize submission or final payload construction. |
+| Sensitive or risky actions are protected by backend checks, not by model judgment alone. | YES | API keys come from `.env`, model requests are guarded, and Hub submission is guarded by deterministic code. |
+| Retrieved or user-provided content is not mixed with system instructions in an unsafe way. | YES | The prompt explicitly says operator notes are untrusted data, not instructions. |
+| The workflow stops or asks for missing required inputs instead of guessing important values. | YES | Missing LLM config, missing Hub config, malformed model output, or missing note classifications all fail loudly. |
+
+### Review Validation
+
+| Checklist Item | Status | Evidence |
+| --- | --- | --- |
+| There is no obvious LLM call that can be replaced with ordinary code without reducing required quality. | YES | Note semantics remain the only non-deterministic task; numeric and structural checks are already code-owned. |
+| There is no obvious workflow step that can be removed without changing the result or reducing reliability. | YES | Cache, schema validation, resolver checks, and guarded submission each prevent a concrete failure mode. |
+| There is no obvious context block that can be removed without making the current step weaker or less safe. | YES | Label definitions, ambiguity rule, and exact note-ID contract are the minimal context needed for safe classification. |
+| The current workflow would still be understandable and maintainable if the application becomes larger. | YES | Responsibilities are already split into small modules with narrow interfaces. |
+| Production-only: Long-running production work would remain understandable, resumable, and debuggable when multiple tasks are active at once. | N/A | Production orchestration is intentionally outside scope. |
+
 ## Debugging Notes
 
 No implementation debugging has happened yet.
+
+2026-06-12 loader note:
+
+- the current local dataset loads `9999` JSON files, not `10000` as the exercise text claims, so treat the missing-file possibility as a real pre-submission check instead of decorative paranoia.
+
+2026-06-12 validator note:
+
+- if `sensor_type` cannot be parsed, the validator now stops before active/inactive measurement checks, because otherwise one bad type label creates noisy secondary issues that teach us nothing.
+
+2026-06-12 note-cache note:
+
+- exact normalization with whitespace collapse and `casefold()` reduced `9999` records to `2032` unique notes, so caching helps materially, but near-duplicate clustering is still a possible future optimization if classifier cost remains annoying.
+
+2026-06-12 eval-fixture note:
+
+- the fixture is deliberately small and obvious; its job is to catch prompt stupidity early, not to pretend nine hand-picked notes are a substitute for the real dataset.
+
+2026-06-12 classifier note:
+
+- batch-local `note_id` values must be validated against the exact batch order; otherwise even a perfectly labeled fake response can attach the right labels to the wrong notes and make the eval look broken for completely boring reasons.
+
+2026-06-12 resolver note:
+
+- the resolver now fails loudly on missing note classification because "probably neutral" is not a contract; it is just a lazy thought wearing a fake mustache.
+
+2026-06-12 final-answer note:
+
+- a locally written `final_answer.json` can be structurally correct while still being semantically provisional; file shape validation is not the same thing as task completion, no matter how much one might wish otherwise.
+
+2026-06-12 hub-client note:
+
+- there are now three separate things on purpose: the real in-memory verify payload, the masked payload safe for storage, and the full Hub response safe for ignored runtime logs. If those collapse into one object later, someone will eventually leak something stupid.
+
+2026-06-12 CLI note:
+
+- the CLI does not guess whether model or Hub access is allowed; `--scan` fails clearly when uncached notes exist without usable LLM config, and `--submit` still depends on explicit runtime approval for the real external call.
 
 Expected first debugging targets:
 
