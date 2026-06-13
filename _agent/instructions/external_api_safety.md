@@ -12,6 +12,13 @@ These instructions are subordinate to `AGENTS.md`. If any point appears to confl
 - Store real secrets only in `.env` files. Outside `.env`, use masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - If generated payloads, reports, or logs would normally include a secret or externally supplied operational endpoint, omit it, mask it, or refer to it by configuration name.
 
+## TLS Preparation
+
+- Before every real OpenAI API call, apply the TLS/CA environment setup from `TROUBLESHOOTING.md`.
+- Set both `REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE` to the documented combined CA bundle before starting the Python process.
+- Treat this as a proactive prerequisite, not as a recovery step after a certificate error.
+- Keep TLS verification enabled. Never use `verify=False` or an equivalent verification bypass.
+
 ## Approval And Guards
 
 - Ask for approval before real external API calls unless the user has already approved the specific action.

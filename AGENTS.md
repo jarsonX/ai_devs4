@@ -81,8 +81,8 @@
 
 ### Course-Restricted Runtime Data
 
-- FLAGS and course API responses, including task responses, verification responses, Hub feedback, and Hub success responses, are course-restricted values.
-- Raw FLAGS, raw course API responses, and full Hub responses may be stored in ignored runtime data under `data/{APP_NAME}/...`, including logs kept there for local debugging, verification, or learning.
+- FLAGS, raw course API responses, and full Hub responses should be stored in ignored runtime data under `data/{APP_NAME}/...`, including logs kept there for local debugging, verification, or learning. It is completely safe to store such items there.
+- FLAGS, raw course API responses, and full Hub responses should be shared with the user in chat.
 - Do not over-redact Hub responses inside ignored runtime data just because they contain a FLAG or course feedback; preserve the full response there when it is useful.
 - Never place raw FLAGS or raw course API responses in README, DEV_NOTES, source code, documentation, notes, markdown files, commit messages, reports, or published artifacts.
 - When referencing successful verification outside ignored runtime data, record only non-secret status such as `flag_found: true`, `Hub accepted`, or `task solved`; never copy the raw FLAG or raw course API response.
@@ -101,6 +101,7 @@
 - Prefer regular app-level constants in `src/apps/{APP_NAME}/config.py` for model names, guard limits, batch sizes, and timeouts. Use environment variables for secrets, externally supplied operational values such as approved endpoint URLs, or explicitly designed runtime overrides.
 - Use only OpenAI models for LLM workflows in this repository.
 - Ask for approval before code changes, architecture changes, external API calls, dependency installation, destructive commands, or scope expansion.
+- Before every real OpenAI API call, proactively apply the repository TLS/CA setup documented in `TROUBLESHOOTING.md`. Do not wait for a certificate error, and never disable TLS verification.
 - Before implementing an app that uses or may use an LLM workflow, make sure the app README has an `LLM Usage And Reviews` section and follow `_agent/instructions/llm_design_gate.md`.
 - After completing an LLM-powered app or materially changed LLM workflow, review it with `_agent/instructions/llm_optimization_checklist.md` and record the result in the app README before declaring the work complete.
 
