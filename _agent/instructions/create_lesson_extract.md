@@ -186,7 +186,6 @@ GLOSSARY_FILE is the repository-root human-facing glossary.
 Purpose:
 - help the human learner understand abbreviations and concepts found in extract files,
 - provide short beginner-friendly explanations,
-- map terms to related extract references.
 
 GLOSSARY_FILE must be written in English.
 
@@ -841,7 +840,6 @@ Do not add secrets, course FLAGS, task completion answers, challenge verificatio
 After GLOSSARY_FILE has been updated, stop and report:
 - new terms added,
 - existing terms updated,
-- related references added to existing terms,
 - terms considered but skipped,
 - uncertainties,
 - whether Step H is recommended or can be skipped.
