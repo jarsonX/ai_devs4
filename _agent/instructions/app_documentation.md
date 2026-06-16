@@ -86,8 +86,36 @@ DEV_NOTES stores working context that should not clutter README. It is optional 
 
 A DEV_NOTES file should usually include one or more of these sections:
 
+- `Implementation Plan`: required whenever DEV_NOTES exists; a batch-based plan for AI-agent implementation work.
 - `Implementation Notes`: important details discovered while building the app.
 - `Design Decisions`: non-obvious choices and their trade-offs.
 - `Debugging Notes`: bugs, failed approaches, root causes, and how they were fixed.
 
 DEV_NOTES should not duplicate README. If a note describes the current app contract, move it to README. If it describes reasoning, development history, debugging, trade-offs, or unresolved work, keep it in DEV_NOTES.
+
+## DEV_NOTES Implementation Plan
+
+When `{APP_NAME}_DEV_NOTES.md` exists, it must include an `Implementation Plan` section.
+This section is the working plan for an AI coding agent and should be organized into batches rather than one long undifferentiated checklist.
+
+Each batch should include:
+
+- a short batch title, for example `Batch 1: App Skeleton And Data Access`;
+- `Goal`: the outcome of the batch in plain English;
+- `Steps`: ordered implementation steps that belong together;
+- `Checkpoint`: the smallest practical verification before moving to the next batch.
+
+The plan should help an agent make coherent changes without losing architecture discipline.
+Use batches to group work by natural implementation boundaries such as app skeleton, data loading, parsing, model integration, response assembly, tests, verification helpers, and final public validation.
+
+The plan should also state when the agent must stop for approval before continuing, for example:
+
+- architecture changes;
+- LLM usage or expanded LLM scope;
+- dependency installation;
+- external API calls;
+- public exposure or deployment;
+- destructive commands or irreversible data changes.
+
+Keep the plan implementation-oriented.
+Do not duplicate the README contract, HTTP examples, configuration tables, or accepted LLM review record unless the detail is needed to guide the next code change.
