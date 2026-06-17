@@ -29,19 +29,20 @@ The external agent has only 10 steps, so it should not be forced to discover pro
 
 ## Current Status
 
-This app is in design phase only.
-The initial high-level concept has been revised after re-reading the task requirement that the external agent may pass Polish natural-language product descriptions such as `potrzebuje kabla dlugosci 10 metrow`.
-Source implementation has not started yet.
-The LLM design review has passed for a narrow Polish query interpreter only.
+This app is complete for the current course task.
+It has passed local verification, real OpenAI-backed smoke checks through a public `pinggy` tunnel, and final Hub verification for `negotiations`.
 
-Current design boundary:
+The final public run was not a straight-line happy path.
+Manual tunnel checks, manual Hub submissions, and manual inspection of real run logs were needed to separate transport issues from application issues and to confirm where the deterministic matcher was too strict for the actual task behavior.
+
+The final implementation keeps the approved narrow LLM boundary and lets deterministic code own the hard safety decisions:
 
 - one public tool endpoint instead of two separate endpoints;
 - one request may contain one to three product descriptions in natural language;
-- deterministic-only product matching is not accepted as the final design because Polish free-form requests are an explicit task requirement;
-- the approved direction is a hybrid design: LLM-based Polish query interpretation followed by deterministic catalog validation and city intersection;
-- the tool should return compact, Polish, agent-usable output under the 500-byte task limit;
-- the service should explicitly distinguish between no match, matched-but-unavailable, and matched-with-common-cities cases.
+- the implemented direction is a hybrid design: LLM-based Polish query interpretation followed by deterministic catalog validation and city intersection;
+- the tool returns compact Polish output under the 500-byte task limit;
+- the service distinguishes between no match, matched-but-unavailable, no-common-city, clarification, and matched-with-common-cities cases;
+- underspecified requests can still succeed when the deterministic matcher finds one strong, conflict-free winner, for example `akumulator pod 48V`.
 
 ## Workflow
 
@@ -85,7 +86,7 @@ Why this is the right level:
 - deterministic validation and set intersection should stay inside the service because those parts are stable and testable;
 - the external agent should receive the final set of candidate cities, not raw intermediate data.
 
-Planned tool responsibility:
+Tool responsibility:
 
 | Tool | Responsibility |
 | --- | --- |
@@ -121,7 +122,7 @@ The only approved LLM step is `query_interpreter`.
 Its job is to convert the incoming Polish `params` string into one to three structured product needs.
 It must not select final catalog item codes, city codes, city names, availability, or the final `output` string.
 
-Planned model call:
+Implemented model call:
 
 | Setting | Value |
 | --- | --- |
@@ -201,7 +202,7 @@ Response shape:
 }
 ```
 
-Planned response behavior:
+Response behavior:
 
 | Situation | Response goal |
 | --- | --- |
@@ -217,9 +218,9 @@ All values inside `output` should be Polish except original catalog item names a
 
 | Area | Status | Evidence |
 | --- | --- | --- |
-| LLM usage | Yes | Planned scope is a narrow LLM-based Polish query interpreter followed by deterministic catalog validation and city intersection. |
+| LLM usage | Yes | Implemented scope is a narrow LLM-based Polish query interpreter followed by deterministic catalog validation and city intersection. |
 | Design review | Passed | `_agent/instructions/llm_design_checklist.md`; 2026-06-16; scope: Batch 0 LLM-based Polish query interpreter plus deterministic validation; result: PASS; boundary: implement one no-tool `gpt-5.4-mini` interpreter call with strict structured output, one retry, 1,000-character input cap, 600 output-token cap, exact-input in-memory cache, deterministic catalog validation before any answer, and promote to `gpt-5.5` only after failed interpreter tests justify it. |
-| Optimization review | N/A | No LLM workflow has been implemented or approved yet. |
+| Optimization review | Passed | `_agent/instructions/llm_optimization_checklist.md`; 2026-06-16 initial local review PASS; 2026-06-17 final follow-up confirmed the same scoped design after real OpenAI smoke validation, `pinggy` exposure, structured-output schema repair, deterministic underspecified-battery handling, and successful Hub acceptance. |
 
 The approved LLM scope is only the interpreter described above.
 Any broader LLM use, tool-using model step, model-selected catalog item, or model-written final answer requires a new design review.
@@ -237,24 +238,36 @@ The public tool endpoint and verification helper need course configuration; the 
 | `AI_DEVS_API_KEY` | Course API key used only by the separate registration or verification flow, not by the tool endpoint itself. |
 | `HUB_VERIFY_URL` | Verification endpoint used by the registration helper flow. |
 | `OPENAI_API_KEY` | Authenticates the approved Polish query interpreter call. |
+| `HUB_REQUEST_TIMEOUT_SECONDS` | Optional Hub helper request timeout override. |
 
 Model name, prompt text, schema name, token limits, retry limits, and cache policy are regular app constants.
 Secrets remain in `.env`.
 
 ## Run
 
-There is no runnable entrypoint yet because the app is still in design phase.
-
-Planned local entrypoint after implementation:
+Local data validation does not call external APIs:
 
 ```powershell
-.\venv\Scripts\python.exe -m src.apps.L14_negotiations.main
+.\venv\Scripts\python.exe -m src.apps.L14_negotiations.main --check-data
 ```
 
-Planned public exposure options:
+Local server startup requires `OPENAI_API_KEY`, because the public POST endpoint uses the approved LLM interpreter:
+
+```powershell
+.\venv\Scripts\python.exe -u -m src.apps.L14_negotiations.main --serve
+```
+
+Public exposure options:
 
 - run locally and expose the endpoint through a short-lived tunnel such as `pinggy`;
 - deploy to any public server if a longer-lived endpoint is needed.
+
+Hub helper commands after the public endpoint is reachable:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L14_negotiations.register "<PUBLIC_TOOL_URL>"
+.\venv\Scripts\python.exe -m src.apps.L14_negotiations.register --check
+```
 
 ## Public Exposure
 
@@ -277,7 +290,7 @@ Important difference:
 - `L14_negotiations` must submit an `answer.tools` array with one tool URL and description.
 - `L14_negotiations` verification is asynchronous, so the helper should support both registration and `action: "check"`.
 
-Planned final registration payload shape:
+Final registration payload shape:
 
 ```json
 {
@@ -294,7 +307,7 @@ Planned final registration payload shape:
 }
 ```
 
-Planned async check payload:
+Async check payload:
 
 ```json
 {
@@ -308,8 +321,6 @@ Planned async check payload:
 
 ## Main Modules
 
-These modules are planned, not implemented yet.
-
 | Module | Purpose |
 | --- | --- |
 | `config.py` | Runtime paths, server settings, and small deterministic limits. |
@@ -320,19 +331,35 @@ These modules are planned, not implemented yet.
 | `availability.py` | Resolve city availability and compute common-city intersections. |
 | `schemas.py` | Request and response validation. |
 | `server.py` | Minimal HTTP API surface for the public tool endpoint. |
-| `register.py` | Optional helper for `/verify` registration and async status checks. |
+| `register.py` | Guarded helper for `/verify` registration and async status checks. |
 
 ## Verification
 
-Implementation has not started, so there is no runnable verification command yet.
+Current local verification:
 
-Planned verification layers:
+```powershell
+.\venv\Scripts\python.exe -m compileall -q src\apps\L14_negotiations
+.\venv\Scripts\python.exe -m src.apps.L14_negotiations.main --check-data
+.\venv\Scripts\python.exe -m unittest discover -s tests\L14_negotiations -v
+```
 
-1. Unit tests for normalization and candidate scoring.
-2. Interpreter contract tests for Polish paraphrases, missing details, invalid schema recovery, and cache behavior.
-3. Integration tests for end-to-end requests against the local HTTP endpoint.
-4. Manual dry runs with compact Polish responses under the 500-byte limit.
-5. Final course verification by registering the public tool URL and checking the async result.
+Current verification status:
+
+- the CSV loader reads 51 cities, 2137 items, and 5349 item-city relations;
+- the response assembler returns Polish `output` strings for success, no match, unavailable item, clarification, and no-common-city cases;
+- representative outputs stay under the 500-byte response limit;
+- local HTTP handler tests cover valid POST `/` and invalid payload rejection;
+- 20 local tests pass, including the strict OpenAI schema shape and the `akumulator pod 48V` acceptance case;
+- a real OpenAI-backed `POST /` smoke test through `pinggy` returned matched product output for representative renewable-energy inputs;
+- Hub accepted the final public tool run and the task was solved;
+- final human-readable success status is safe to record as `flag_found: true`, while the raw flag remains only in ignored runtime data.
+
+Manual public verification notes:
+
+1. Use `curl.exe -i` or add the `X-Pinggy-No-Screen` request header when testing a free `pinggy` URL manually, because browser-like requests may receive the warning page instead of the tool response.
+2. If the public tool returns the fallback interpretation message, inspect `data/L14_negotiations/logs/server_runtime_errors.log` before changing matcher logic.
+3. Treat `Invoke-WebRequest` carefully in PowerShell because `.Content` may arrive either as `System.Byte[]` or as a decoded string depending on the response path.
+4. Real task tuning depended on manual observation, not only local fake-client tests. In particular, the accepted handling of `akumulator pod 48V` came from combining Hub behavior, public-run logs, and direct inspection of `data/L14_negotiations/input/items.csv`.
 
 ## Assumptions And Limits
 
