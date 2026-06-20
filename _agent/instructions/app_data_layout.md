@@ -11,6 +11,7 @@ Use these instructions when handling app inputs, outputs, references, logs, cach
 - Documentation should describe app data paths as repository-root-relative paths, for example `data/{APP_NAME}/input/example.txt` or `data/{APP_NAME}/output/result.json`.
 - Do not store secrets in app data files.
 - If a generated payload would normally include a secret, save only a masked value, omit the secret, or store the secret only in `.env`.
+- FLAGS are not secrets in this repository policy. Course FLAGS, raw course API responses, and Hub responses are governed by `_agent/instructions/course_runtime_data_and_leak_checks.md` and may be stored under `data/{APP_NAME}/...`.
 
 ## Why This Matters
 

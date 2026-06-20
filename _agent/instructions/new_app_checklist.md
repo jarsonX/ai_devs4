@@ -4,6 +4,8 @@ Use these instructions when creating a new app under `src/apps/{APP_NAME}`.
 
 ## Required Structure
 
+This checklist is a routing summary. Detailed rules live in the referenced instruction files.
+
 - Put application code under `src/apps/{APP_NAME}/`.
 - Put app documentation under `src/apps/{APP_NAME}/docs/`.
 - Create `src/apps/{APP_NAME}/docs/{APP_NAME}_README.md` unless the app is explicitly excluded.

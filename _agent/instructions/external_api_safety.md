@@ -6,9 +6,12 @@ These instructions are subordinate to `AGENTS.md`. If any point appears to confl
 
 ## Relationship To AGENTS.md
 
-- Use the `AGENTS.md` Safety Boundaries section as the source of truth for what is a secret, what is a local learning artifact, and where each value may be stored.
+- Use `AGENTS.md` as the source of truth for secret handling and core API-call boundaries.
+- Use `_agent/instructions/course_runtime_data_and_leak_checks.md` as the source of truth for how FLAGS, raw course API responses, Hub responses, and related runtime artifacts may be stored or shown to the user.
+- Use `_agent/instructions/change_and_approval_gates.md` as the source of truth for when API work requires approval.
 - Do not broaden the `AGENTS.md` secret definition only because a value came from an API response.
-- Store task inputs, API feedback, retrieved records, FLAGS, final answers, and debugging observations only as local learning artifacts in ignored runtime data such as `data/{APP_NAME}/...` when they are useful for learning or debugging.
+- When storing task inputs, API feedback, retrieved records, FLAGS, final answers, and debugging observations, store them as local learning artifacts in ignored runtime data such as `data/{APP_NAME}/...` when they are useful for learning or debugging.
+- FLAGS are not secrets in this repository policy and may be shown to the user in chat.
 - Store real secrets only in `.env` files. Outside `.env`, use masked values or configuration names such as `API_BASE_URL`, `HUB_VERIFY_URL`, or `OPENAI_API_KEY`.
 - If generated payloads, reports, or logs would normally include a secret or externally supplied operational endpoint, omit it, mask it, or refer to it by configuration name.
 
@@ -23,6 +26,7 @@ These instructions are subordinate to `AGENTS.md`. If any point appears to confl
 
 - Ask for approval before real external API calls unless the user has already approved the specific action.
 - Keep exploratory API usage small and explicit.
+- Follow `_agent/instructions/debugging_workflow.md` for guarded debug, workbench, or inspection scripts.
 - Any debug, workbench, or inspection script that makes real OpenAI or external API calls must include a hard execution guard such as `max_iterations`, `max_model_requests`, or `max_tool_calls`.
 - When the guard limit is reached, the script must stop with a clear guard-related error.
 - Prefer configuration names in docs and logs. Do not echo raw secret values.

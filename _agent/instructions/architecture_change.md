@@ -4,6 +4,7 @@ Use these instructions before larger changes to architecture, scope, data flow, 
 
 ## Decision Policy
 
+- Use `_agent/instructions/change_and_approval_gates.md` as the source of truth for approval gates.
 - Make only the assumptions needed for the current approved work.
 - State assumptions that affect the result.
 - Ask for approval before assumptions that affect architecture, scope, or learning value.
