@@ -20,6 +20,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Agentic workflow | A workflow where one or more model-driven agents choose steps, gather information, delegate work, or synthesize results from changing context. It is useful when fixed code or one simple model call is too rigid. |
 | Agent-oriented knowledge base | A knowledge base organized so an agent can navigate it through entry points, links, folders, and instructions instead of guessing every search query. It is useful when documents are meant to guide agent work, not only store information. |
 | AI | Artificial Intelligence. In this glossary it usually means software behavior powered by models, such as LLMs, agents, or image/audio/video models. |
+| AI workflow | A workflow that combines normal application logic with one or more AI or LLM calls. It needs extra validation because it can return technically successful but incomplete or wrong results. |
 | AI-assisted deployment safety | Rules for using AI help during deployment without blindly trusting it. The human or deterministic code should still control secrets, infrastructure, and risky changes. |
 | AI-friendly API | An API that is easy for a model to choose and call correctly. It should have clear names, clear inputs, clear outputs, and useful error messages. |
 | Anomaly detection | Monitoring for unusual behavior such as cost spikes, long latency, repeated failures, or abuse patterns. It helps notice when the system needs a code-level response, not only a report. |
@@ -43,11 +44,13 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Bulk processing | Applying deterministic code to many files or records without sending each item through model context. It is useful for repeatable parsing, filtering, aggregation, and calculation. |
 | Cache | Temporary information that may be reused but is not automatically trusted knowledge. Search results, scraped pages, and sandbox outputs often start as cache until validated. |
 | Caching | Saving a result so the system can reuse it later instead of doing the same expensive work again. It is useful when the same input should produce the same result. |
+| Canary check | A recurring test that sends known input through a workflow to see whether the output still looks acceptable. It helps catch regressions that normal uptime monitoring may miss. |
 | Capability inventory | A source-checked list of actions available in an API or SDK. It helps decide which capabilities are required, optional, unnecessary, or forbidden before tools are designed. |
 | Capability map | A concise description of what an agent or team can do. It helps route work without duplicating every detailed tool schema in the prompt. |
 | Checksum guard | A safety check that notices when a file changed since it was last read. It helps avoid overwriting someone else's newer changes. |
 | Chunk | A smaller piece of a larger document. Search systems often use chunks because they are easier to find, rank, and place into model context. |
 | Chunking strategy | The rule for splitting documents into chunks. A good strategy keeps chunks small enough to search, but large enough to keep useful meaning. |
+| Circuit breaker | A runtime guard that temporarily stops calls to a failing dependency. It helps the workflow fail fast instead of wasting time, tokens, and resources on calls that are likely to fail. |
 | Claim | An atomic reservation that gives one worker temporary ownership of a task. It prevents multiple workers from performing the same task at the same time. |
 | Classification | Assigning input to one of several predefined categories. For example, classifying a message as `question`, `bug`, or `feedback`. |
 | Classification prompt | A prompt that asks the model to choose from predefined categories. The allowed categories should be listed clearly. |
@@ -74,6 +77,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Data exposure review | A check of what data the agent can access. The goal is to give access only to what the task really needs. |
 | Data movement | Moving information from one place to another, such as from a file into an email. This can be risky if private data goes to the wrong destination. |
 | Dataset | A set of examples used to test or evaluate model or agent behavior. A good dataset covers important cases, varied inputs, and balanced categories. |
+| Dead letter queue | A queue or table that stores work items a system could not process after retries were exhausted. It lets the team review, alert, or reprocess failures instead of losing data. |
 | Decomposed processing | Splitting one media task into smaller steps. For video, this may mean extracting audio, transcribing speech, and checking frames separately. |
 | Deep Action | An iterative agent workflow that uses research-like steps to produce an action plan, code change, audit, or operational decision. It should still require approval before real side effects. |
 | Deep Research | A long-running workflow where an agent clarifies a question, searches, reads, finds gaps, repeats, and writes a structured report. It is useful for broad tasks where one search is not enough. |
@@ -113,6 +117,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Execution bridge | A controlled interface that lets sandboxed code call selected tools or host services. The bridge must enforce its own permissions because process isolation alone does not make those calls safe. |
 | Execution guard | A check that happens before the system performs an action. It can verify required inputs, permissions, confirmations, or safe routing. |
 | Experiment | A controlled eval run that compares prompts, models, tool definitions, or agent versions on a dataset. It should record versions and metrics so results can be reproduced. |
+| Exponential backoff | A retry strategy where the delay grows after each failed attempt. It reduces pressure on a busy or failing service compared with retrying immediately. |
 | Exposure surface | Everything the agent can reach: tools, data, permissions, and actions. A smaller exposure surface usually means lower risk. |
 | External context | Information loaded from outside the model, such as files, tool results, search results, messages, or attachments. It can help answer, but it may be incomplete or unsafe. |
 | Extraction | Pulling specific facts from messy or unstructured input. For example, extracting name, date, and address from an email. |
@@ -127,6 +132,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Generated media reference | A file reference for generated media, such as an image, chart, or video. It connects the generated asset to later document or validation work. |
 | Generation | One model call, including the prompt context, model settings, output, token usage, latency, and cost. In observability, generations are usually nested inside a trace. |
 | Global context | Shared context that can influence many agents or sessions over time, such as memory, project notes, goals, or a knowledge base. It needs clear ownership because mistakes can spread across future work. |
+| Graceful degradation | A fallback mode where the system keeps doing the safe useful parts of the workflow when one dependency is unavailable. The user or operator should see that the result is partial or delayed, not complete. |
 | Graph memory | A memory layer that stores facts, entities, sources, and relationships in a graph. It can help an agent follow connections, but it needs auditing and cleanup. |
 | Graph-RAG | Retrieval-Augmented Generation that combines document search with graph traversal. The agent can retrieve chunks, inspect entities, follow relationships, and answer from both text and graph evidence. |
 | grep | A command-line text search tool. It is useful for finding exact words or patterns in local files before using heavier retrieval methods. |
@@ -145,6 +151,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Instruction dropout | A situation where the model misses or ignores important instructions. This can happen when the context is too long, noisy, or conflicting. |
 | Instruction/data separation | Keeping instructions separate from external content. A web page, file, or tool result should not be allowed to secretly become a new instruction. |
 | Interface pressure test | Using a less capable model to reveal unclear prompts, hidden assumptions, or overly complex tool contracts. The test should improve the interface, not lower the required correctness standard. |
+| Jitter | Random variation added to retry delays. It prevents many workers from retrying at the same moment and making an overloaded service even worse. |
 | JSON | JavaScript Object Notation. A simple text format for structured data, often used for API requests, tool arguments, and model outputs. |
 | JSON prompt | JavaScript Object Notation prompt. A prompt written as structured JSON, so each part can be edited separately and precisely. |
 | Latency | The time a user or system waits for a result. In AI apps, latency often comes from model calls, tool calls, retries, and large context. |
@@ -197,6 +204,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Orchestrator | A central agent or controller that delegates tasks, collects results, decides next steps, and contacts the user when needed. It keeps a multi-agent workflow coherent, but can become a bottleneck if overloaded. |
 | Orchestrator-only tools | Tools reserved for a manager or coordinator agent, such as spawning agents, managing agent status, sending notifications, or coordinating shared state. They should not automatically be given to every specialist. |
 | Out-painting | Extending an image beyond its original borders. The model generates new surrounding content that should match the image. |
+| Output quality monitoring | Checking whether model outputs are useful, complete, and plausible, not only whether the API responded. Useful checks include required fields, output length, topic coverage, canary checks, latency, and token usage. |
 | Output token limit | The maximum amount of text a model is allowed to generate in one response. A large input can leave less room for output. |
 | Output validation | Checking a model's output before the system uses it. This can include checking format, allowed values, and whether the answer makes sense. |
 | Partial retrieval | A search result that includes some useful information but misses other important information. It can lead to answers that are partly correct but incomplete. |
@@ -249,6 +257,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Residual risk | Risk that remains after safeguards are applied. A classifier, sandbox, approval step, or other control may reduce danger without guaranteeing that failure is impossible. |
 | Response contract | The expected shape and meaning of a response. It should explain success, failure, missing data, and possible next steps. |
 | Retrieval gap | A situation where an agent retrieves a useful-looking document but misses related context that would change the answer. It is dangerous because the agent may not know anything is missing. |
+| Retry | Trying an operation again after a failure. Retries should be limited and should usually be used only for failures that may recover, such as timeouts or rate limits. |
 | Reverse proxy exposure | Publishing a server through a routing layer such as `nginx`. This changes how the server is reached and what security controls are needed. |
 | ripgrep | A fast command-line text search tool, usually run as `rg`. It is a strong first choice for searching small or medium local text corpora by exact terms or patterns. |
 | Risk-bearing action | An action that can spend money, expose data, change state, contact someone, delete content, or create legal or business risk. It needs stronger controls. |
@@ -265,6 +274,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Sealed memory | A compact, durable record of completed work and essential state used to resume a task without replaying its full conversation. It should contain validated facts, artifacts, and remaining work. |
 | Search architecture | The chosen design for finding information. It may use file search, a database, keyword search, embeddings, or a mix of methods. |
 | Self-verification | Asking a model to review an answer or output. It can catch some errors, but it should not replace real validation. |
+| Semantic failure | A failure where the system returns a technically valid response that is wrong, incomplete, hallucinated, or unusable for the task. It is common in AI workflows because HTTP success and valid JSON do not prove correctness. |
 | Semantic plausibility | Whether an output seems reasonable for the task, not only whether it has the right format. It helps catch strange or impossible values. |
 | Semantic search | Search by meaning instead of exact words. It usually compares embeddings to find content that is conceptually similar. |
 | Session | A grouped user thread, chat, task, or related agent run. In observability, a session helps connect multiple traces that belong to the same ongoing work. |
@@ -278,6 +288,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Shared knowledge base | A shared folder or document set where multiple agents write and read intermediate knowledge for a larger workflow. It acts as the continuity layer between sessions. |
 | Shared state | Memory, workspace files, queues, databases, or other external state that multiple agents can read or write. It should be treated as governed infrastructure, not as casual background text. |
 | Signal convergence | The combination of several independent facts that together justify an agent action. It reduces the chance of acting on one weak or stale signal. |
+| Silent degradation | A failure mode where a workflow keeps running but quietly produces worse, shorter, incomplete, slower, or less reliable results. It is dangerous because normal logs may still look successful. |
 | Similar document | A document that looks close to the query by keywords or embeddings. Similar does not always mean useful for the user's real question. |
 | Site instruction | Curated operating knowledge for one website, such as route patterns, selectors, navigation steps, and failure checks. It should remain separate from unreviewed lessons discovered during a run. |
 | Source document | The original document that chunks or search entries come from. Keeping the source link helps verify and cite answers. |
@@ -314,6 +325,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Task list | A short progress list for multi-step work. It helps the system remember what is done and what is still pending. |
 | Task-bounded tool | A tool whose actions, data access, and defaults are narrower than the source API because the agent has a limited responsibility. Narrowing the tool reduces ambiguity and unnecessary risk. |
 | Template instruction files | Files that explain how to use a selected MCP template. They guide the implementation so it matches the template's intended structure. |
+| Thundering herd | A failure pattern where many workers retry at the same time and overload the service they are trying to reach. Backoff and jitter help spread those retries out. |
 | Token burn | Wasted token usage from too much context, repeated calls, long outputs, or loops. Token burn increases cost and latency. |
 | Tool assignment | Deciding which tools, actions, integrations, or tool families each agent can access. Good assignment balances usefulness, context size, permissions, and data movement risk. |
 | Tool connection risk | Risk created when an agent can move data between systems through a combination of tools. Even safe-looking tools can become risky when connected. |
@@ -329,6 +341,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Trace | A grouped record of one top-level user interaction or agent task. It connects nested model calls, tool calls, spans, events, costs, and outputs so the behavior can be understood later. |
 | Transformation | Converting input into another form, structure, or wording. For example, turning notes into JSON or rewriting text in a clearer style. |
 | Transformation prompt | A prompt that asks the model to convert input into another format, structure, or wording. It should define what must change and what must stay true. |
+| Transient failure | A temporary failure that may succeed if tried again later, such as a timeout, network issue, overload, or rate limit. It is the main kind of failure that retry policies are meant to handle. |
 | Tree topology | A multi-agent hierarchy where manager or lead roles sit between the root coordinator and worker agents. It is useful only when the extra layer reduces coordination load, enforces boundaries, or verifies work. |
 | Trusted action | An action the user has allowed to run without repeated confirmation under known conditions. If the tool changes, that trust should be reviewed. |
 | TTS | Text-to-speech. Converting written text into spoken audio. |
