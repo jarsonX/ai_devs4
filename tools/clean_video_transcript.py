@@ -1,6 +1,6 @@
 from pathlib import Path
 
-file_path = Path("_agent/references/raw/L18_Part1.md")
+file_path = Path("_agent/references/raw/S04E04.md")
 
 lines = file_path.read_text(encoding="utf-8").splitlines()
 
@@ -10,7 +10,7 @@ for line in lines:
     if not line.startswith("*") and line != '':
         cleaned_lines.append(line)
 
-cleaned_text = "\n".join(cleaned_lines)
+cleaned_text = "\n\n".join(cleaned_lines)
 
 file_path.write_text(cleaned_text, encoding="utf-8")
 

@@ -124,6 +124,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Extraction prompt | A prompt that asks the model to pull specific facts from text or media. It should name the fields the model must return. |
 | False negative | An eval result where the score says the output is bad, but the output is actually good. This usually means the evaluator, expected answer, or dataset needs improvement. |
 | False positive | An eval result where the score says the output is good, but the output is actually bad. This is dangerous because it can hide real system failures behind a nice metric. |
+| Freshness check | A deterministic check that verifies input data is recent enough for the job or decision using it. It helps prevent old data from producing new-looking output. |
 | FTS | Full-Text Search. Search based on exact words, phrases, or tokens in text. |
 | FTS5 | Full-Text Search 5. SQLite's built-in full-text search feature used for keyword-style search. |
 | Full-text search | Search based on words that appear in documents. It works especially well for names, IDs, filenames, and exact phrases. |
@@ -140,6 +141,8 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Guardrail | Runtime logic that blocks, filters, moderates, or constrains unsafe or unwanted behavior. Guardrails enforce boundaries while evals only measure behavior. |
 | Hallucination | Model output that is not supported by the available information. It may sound confident even when it is wrong. |
 | Heartbeat | A periodic cycle that either coordinates durable tasks or checks whether current conditions require attention. Unlike CRON, an attention heartbeat may finish successfully without taking any action. |
+| Heartbeat monitoring | A monitoring pattern where a scheduled job reports that it ran and what final status it reached. If the expected report does not arrive, an external monitor can alert the operator. |
+| Healthcheck | A check that proves a system, service, or scheduled job is alive or has completed a required step. For jobs, a healthcheck should distinguish success, refusal, failure, and missing runs. |
 | HTML | HyperText Markup Language. The standard markup language used to structure web pages and some generated documents. |
 | HTTP | HyperText Transfer Protocol. The basic protocol used by browsers, web servers, and many APIs to send requests and responses. |
 | Human checkpoint | A designed pause where a person supplies missing information, resolves ambiguity, approves an action, or accepts partial work. The checkpoint should explain what is blocked and what happens after the decision. |
@@ -161,6 +164,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Live audio interface | A real-time voice interaction where the user and system can take turns quickly. It needs low latency and clear turn handling. |
 | LLM | Large Language Model. A model trained to understand and generate language, often used for chat, reasoning, extraction, and tool use. |
 | LLM-as-judge | A scoring method where a language model grades another model output using a rubric. It is useful for semantic quality checks, but it should not replace simple code checks when code can verify the answer directly. |
+| Lockfile | A file used as a simple lock so another copy of the same job does not start while one run is already active. It should include stale-lock recovery so a crash does not block future runs forever. |
 | Logging and audit | Recording what the system did and why. This helps with debugging, reviewing mistakes, and investigating unsafe behavior. |
 | Lost update | A shared-state failure where two writers read the same old version, prepare different changes, and the later write overwrites the earlier one. It is common when agents rewrite the same free-text memory or file. |
 | Manager agent | An agent that coordinates other agents, monitors progress, routes communication, asks the user when needed, and verifies results. It should have broad visibility only where useful and a narrow set of action tools. |
@@ -206,7 +210,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Out-painting | Extending an image beyond its original borders. The model generates new surrounding content that should match the image. |
 | Output quality monitoring | Checking whether model outputs are useful, complete, and plausible, not only whether the API responded. Useful checks include required fields, output length, topic coverage, canary checks, latency, and token usage. |
 | Output token limit | The maximum amount of text a model is allowed to generate in one response. A large input can leave less room for output. |
-| Output validation | Checking a model's output before the system uses it. This can include checking format, allowed values, and whether the answer makes sense. |
+| Output validation | Checking output before the system uses it. This can include checking that a model answer, file, report, backup, message, or record exists, has the right format, contains plausible values, and is complete enough for its purpose. |
 | Partial retrieval | A search result that includes some useful information but misses other important information. It can lead to answers that are partly correct but incomplete. |
 | Paused loop | An agent execution state where the agent cannot safely continue until it receives missing information, permission, or a decision. It should be explicit so blocked work does not look complete. |
 | PDF | Portable Document Format. A common document format that may need text extraction, OCR, or page-image processing before search or model use. |
@@ -271,6 +275,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Schema sampling | Reading a small, representative set of records to learn a dataset's structure before processing all of it. Good sampling includes ordinary, optional, empty, and unusual cases when available. |
 | Scope reduction | Replacing a broad AI goal with a smaller task, user group, data domain, action set, or decision area. This usually makes the system easier to verify and safer to operate. |
 | SDK | Software Development Kit. A set of libraries, tools, and examples that help developers build with a platform or API. |
+| Scheduled job | A task that runs because a scheduler, cron expression, timer, or queue delay starts it. It needs explicit timing, validation, monitoring, and overlap controls when failure would matter. |
 | Sealed memory | A compact, durable record of completed work and essential state used to resume a task without replaying its full conversation. It should contain validated facts, artifacts, and remaining work. |
 | Search architecture | The chosen design for finding information. It may use file search, a database, keyword search, embeddings, or a mix of methods. |
 | Self-verification | Asking a model to review an answer or output. It can catch some errors, but it should not replace real validation. |
@@ -326,6 +331,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Task-bounded tool | A tool whose actions, data access, and defaults are narrower than the source API because the agent has a limited responsibility. Narrowing the tool reduces ambiguity and unnecessary risk. |
 | Template instruction files | Files that explain how to use a selected MCP template. They guide the implementation so it matches the template's intended structure. |
 | Thundering herd | A failure pattern where many workers retry at the same time and overload the service they are trying to reach. Backoff and jitter help spread those retries out. |
+| Timezone | A named time rule such as `Europe/Warsaw` that tells software how wall-clock time maps to UTC. Scheduled jobs should declare it explicitly so people do not have to guess what `09:00` means. |
 | Token burn | Wasted token usage from too much context, repeated calls, long outputs, or loops. Token burn increases cost and latency. |
 | Tool assignment | Deciding which tools, actions, integrations, or tool families each agent can access. Good assignment balances usefulness, context size, permissions, and data movement risk. |
 | Tool connection risk | Risk created when an agent can move data between systems through a combination of tools. Even safe-looking tools can become risky when connected. |
