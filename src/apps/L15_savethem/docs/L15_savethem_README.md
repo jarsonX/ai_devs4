@@ -116,7 +116,9 @@ flowchart TD
 | --- | --- |
 | `OPENAI_API_KEY` | Authenticates OpenAI Responses API calls for the bounded discovery agent. |
 | `AI_DEVS_API_KEY` | Authenticates `toolsearch`, discovered task endpoints, and guarded Hub verification requests. |
-| `HUB_VERIFY_URL` | Verification endpoint used only in explicit submit mode. |
+| `HUB_BASE_URL` | Required base endpoint for discovered course tool calls. |
+| `HUB_TOOLSEARCH_URL` | Optional full tool discovery endpoint. If omitted, the app derives the toolsearch path from `HUB_BASE_URL`. |
+| `HUB_VERIFY_URL` | Optional verification endpoint used only in explicit submit mode. |
 
 Secrets must live in `.env`.
 Do not place real keys, raw FLAGS, or raw Hub feedback in source code or docs.

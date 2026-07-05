@@ -23,12 +23,13 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | AI workflow | A workflow that combines normal application logic with one or more AI or LLM calls. It needs extra validation because it can return technically successful but incomplete or wrong results. |
 | AI-assisted deployment safety | Rules for using AI help during deployment without blindly trusting it. The human or deterministic code should still control secrets, infrastructure, and risky changes. |
 | AI-friendly API | An API that is easy for a model to choose and call correctly. It should have clear names, clear inputs, clear outputs, and useful error messages. |
+| AI gateway | A central application layer that handles communication with AI models and providers. It keeps model choice, request settings, monitoring, streaming, and provider switching out of scattered feature code. |
 | Anomaly detection | Monitoring for unusual behavior such as cost spikes, long latency, repeated failures, or abuse patterns. It helps notice when the system needs a code-level response, not only a report. |
 | API | Application Programming Interface. A contract that tells software how to ask another system or component to do something. |
 | API constraint audit | A review of an API before exposing it to a model. The goal is to find confusing parts, risky actions, missing limits, or places where a wrapper is needed. |
 | API rate limit | Application Programming Interface rate limit. A limit on how many requests or tokens can be used in a period of time. |
 | Application-induced model error | A model mistake caused by the application setup, not only by the model itself. Examples include missing tools, wrong instructions, or bad context. |
-| Artifact | A durable file or structured record produced during a workflow and used by later tasks or reviewers. It should preserve enough context and provenance to be checked independently. |
+| Artifact | A durable file, content object, or structured record produced during a workflow and used by later tasks or reviewers. It should preserve enough metadata, ownership, state, and provenance to be checked independently. |
 | Assertion | A concrete check used inside an eval, such as requiring valid JSON, matching a value, or asking a model to grade a rubric. Assertions turn broad quality goals into measurable checks. |
 | Attachment | A file or media item included in a request, such as an image, audio file, video, PDF, or document. The system must know whether the model should inspect it or a tool should use it. |
 | Attention item | A task, session, tool call, or agent state that needs human review before the system can safely continue. Examples include missing approval, expired authentication, or a blocked decision. |
@@ -47,6 +48,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Canary check | A recurring test that sends known input through a workflow to see whether the output still looks acceptable. It helps catch regressions that normal uptime monitoring may miss. |
 | Capability inventory | A source-checked list of actions available in an API or SDK. It helps decide which capabilities are required, optional, unnecessary, or forbidden before tools are designed. |
 | Capability map | A concise description of what an agent or team can do. It helps route work without duplicating every detailed tool schema in the prompt. |
+| Canonical internal API format | The application-owned request and response shape used before translating calls to a specific provider. It lets feature code stay stable while adapter code handles provider differences. |
 | Checksum guard | A safety check that notices when a file changed since it was last read. It helps avoid overwriting someone else's newer changes. |
 | Chunk | A smaller piece of a larger document. Search systems often use chunks because they are easier to find, rank, and place into model context. |
 | Chunking strategy | The rule for splitting documents into chunks. A good strategy keeps chunks small enough to search, but large enough to keep useful meaning. |
@@ -110,7 +112,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Evaluation | Checking whether something is correct, good enough, safe, or complete. It can be done by code, a model, or both. |
 | Evaluation harness | The code and configuration that run eval cases, control state, capture traces, apply assertions, and report results. A reliable harness makes repeated comparisons consistent. |
 | Evaluation prompt | A prompt that asks the model to judge quality, correctness, safety, or completion. It should say exactly what criteria to use. |
-| Event | An application-level observation such as a warning, state change, cost alert, or background job marker. Events help explain what happened around model calls and tool calls. |
+| Event | An application-level observation, action, or state change such as a warning, tool call, message, cost alert, or background job marker. Events help explain what happened around model calls, tool calls, agents, and workflows. |
 | Event bus | A routing mechanism that sends events by topic to subscribers. It helps decouple agents or services, but it still needs schemas, duplicate handling, and review boundaries. |
 | Event ingestion | The boundary that validates and converts different trigger formats into one internal event shape. Normalization makes routing consistent without pretending that every trigger needs identical handling. |
 | Event topic | A named event contract such as `ticket.classified` or `user.message`. It tells publishers and subscribers what kind of payload and behavior to expect. |
@@ -154,6 +156,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Instruction dropout | A situation where the model misses or ignores important instructions. This can happen when the context is too long, noisy, or conflicting. |
 | Instruction/data separation | Keeping instructions separate from external content. A web page, file, or tool result should not be allowed to secretly become a new instruction. |
 | Interface pressure test | Using a less capable model to reveal unclear prompts, hidden assumptions, or overly complex tool contracts. The test should improve the interface, not lower the required correctness standard. |
+| Item | A flexible interaction record that can represent different event types, not only a user or assistant message. Items are useful when a workflow must store tool calls, reasoning summaries, confirmations, or actions between multiple actors. |
 | Jitter | Random variation added to retry delays. It prevents many workers from retrying at the same moment and making an overloaded service even worse. |
 | JSON | JavaScript Object Notation. A simple text format for structured data, often used for API requests, tool arguments, and model outputs. |
 | JSON prompt | JavaScript Object Notation prompt. A prompt written as structured JSON, so each part can be edited separately and precisely. |
@@ -212,6 +215,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Output token limit | The maximum amount of text a model is allowed to generate in one response. A large input can leave less room for output. |
 | Output validation | Checking output before the system uses it. This can include checking that a model answer, file, report, backup, message, or record exists, has the right format, contains plausible values, and is complete enough for its purpose. |
 | Partial retrieval | A search result that includes some useful information but misses other important information. It can lead to answers that are partly correct but incomplete. |
+| Pass-through mapping | A provider adapter mapping where the internal request format already matches the provider closely, so little translation is needed. It is still a deliberate mapping boundary, not permission to leak provider details everywhere. |
 | Paused loop | An agent execution state where the agent cannot safely continue until it receives missing information, permission, or a decision. It should be explicit so blocked work does not look complete. |
 | PDF | Portable Document Format. A common document format that may need text extraction, OCR, or page-image processing before search or model use. |
 | Perceived performance | How fast the system feels to the user. Progress messages or partial results can make slow work feel clearer and less frustrating. |
@@ -234,9 +238,12 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Prompt rewrite | Turning a user's rough request and clarifications into a more detailed structured prompt. It is especially useful before long research or deep action workflows. |
 | Prompt template | A reusable prompt with stable parts and editable fields. Templates help keep repeated model calls consistent. |
 | Prompt versioning | Tracking changes to prompts and linking each version to runs, scores, costs, and outputs. This helps compare behavior and roll back bad prompt changes. |
+| Primitive | A small reusable product or architecture building block that can support several more specific features. Choosing the right primitive can make an AI product easier to extend without overbuilding it. |
 | Property graph | A graph model where nodes and relationships can have properties. It is the style of graph used by Neo4j in the L8 Graph-RAG reference. |
 | Provenance | Information about where data came from. In search and RAG, provenance helps trace an answer back to the original file or chunk. |
 | Provider abstraction | A code layer that hides details of a specific model provider. It makes it easier to switch providers or models later. |
+| Provider mapper | Adapter code that converts an application's internal request into one provider's native request and converts the provider response back. It keeps provider-specific field names and quirks out of feature code. |
+| Provider router | Logic that chooses which provider mapper should handle a model request. It may route by model name, explicit provider, agent configuration, tenant policy, or required capability. |
 | Public knowledge | Long-term knowledge that may be shared between agents and users of a system. It needs clear write rules because many people or agents may rely on it. |
 | Public MCP exposure | A Model Context Protocol server or route that can be reached by untrusted or semi-trusted users, clients, or environments. Public exposure needs stronger auth and monitoring. |
 | Query enrichment | Adding helpful details to a query before running it. For example, adding known dates, IDs, language hints, or scope. |
@@ -260,6 +267,7 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Required inputs | Values that must be known before an action can safely run. If they are missing, the system should ask or stop instead of guessing. |
 | Residual risk | Risk that remains after safeguards are applied. A classifier, sandbox, approval step, or other control may reduce danger without guaranteeing that failure is impossible. |
 | Response contract | The expected shape and meaning of a response. It should explain success, failure, missing data, and possible next steps. |
+| Response normalization | Converting different provider responses into one application-owned shape. It lets the rest of the system read outputs, usage, tool calls, errors, and provider metadata consistently. |
 | Retrieval gap | A situation where an agent retrieves a useful-looking document but misses related context that would change the answer. It is dangerous because the agent may not know anything is missing. |
 | Retry | Trying an operation again after a failure. Retries should be limited and should usually be used only for failures that may recover, such as timeouts or rate limits. |
 | Reverse proxy exposure | Publishing a server through a routing layer such as `nginx`. This changes how the server is reached and what security controls are needed. |
@@ -347,10 +355,12 @@ This glossary collects abbreviations and concepts found in root-level `L*.md` fi
 | Trace | A grouped record of one top-level user interaction or agent task. It connects nested model calls, tool calls, spans, events, costs, and outputs so the behavior can be understood later. |
 | Transformation | Converting input into another form, structure, or wording. For example, turning notes into JSON or rewriting text in a clearer style. |
 | Transformation prompt | A prompt that asks the model to convert input into another format, structure, or wording. It should define what must change and what must stay true. |
+| Translated mapping | A provider adapter mapping that must rename fields, reshape messages, adjust settings, or convert streaming events because the provider API differs from the internal format. It should be explicit and tested. |
 | Transient failure | A temporary failure that may succeed if tried again later, such as a timeout, network issue, overload, or rate limit. It is the main kind of failure that retry policies are meant to handle. |
 | Tree topology | A multi-agent hierarchy where manager or lead roles sit between the root coordinator and worker agents. It is useful only when the extra layer reduces coordination load, enforces boundaries, or verifies work. |
 | Trusted action | An action the user has allowed to run without repeated confirmation under known conditions. If the tool changes, that trust should be reviewed. |
 | TTS | Text-to-speech. Converting written text into spoken audio. |
+| Typed endpoint | An API endpoint with a clear business purpose and defined input and output shape. It is safer than a generic model passthrough because the application can validate the request before calling AI. |
 | UI | User Interface. The part of the application the user sees and interacts with. |
 | Unknown unknown | Missing information that the agent has no signal to search for. It is risky because the current context can look complete even when important related context exists elsewhere. |
 | URL | Uniform Resource Locator. A web address or resource location, such as `https://example.com/page`. |

@@ -1,5 +1,18 @@
 # L18 Domatowo README
 
+## Table Of Contents
+
+- [Purpose](#purpose)
+- [Workflow](#workflow)
+- [Mermaid Logic Flow](#mermaid-logic-flow)
+- [LLM Usage And Reviews](#llm-usage-and-reviews)
+- [Configuration](#configuration)
+- [Run](#run)
+- [Main Modules](#main-modules)
+- [Runtime Data](#runtime-data)
+- [Verification](#verification)
+- [What This Task Should Teach](#what-this-task-should-teach)
+
 ## Purpose
 
 `L18_domatowo` solves the `domatowo` course task. The app controls transporters and scouts on the Domatowo map, searches the highest apartment blocks, and calls the evacuation helicopter after a scout confirms the survivor.
@@ -54,7 +67,7 @@ flowchart TD
 | Variable | Purpose |
 | --- | --- |
 | `AI_DEVS_API_KEY` | Authenticates Hub requests. |
-| `HUB_VERIFY_URL` | Hub verification endpoint. Defaults to the public Hub `/verify` endpoint when omitted. |
+| `HUB_VERIFY_URL` | Required Hub verification endpoint loaded from `.env`. |
 
 ## Run
 

@@ -14,7 +14,6 @@ load_dotenv(dotenv_path=REPO_ROOT / ".env")
 
 APP_NAME = "L20_foodwarehouse"
 TASK_NAME = "foodwarehouse"
-DEFAULT_VERIFY_URL = "h" + "ttps://" + "hub." + "ag3nts." + "org" + "/verify"
 REQUEST_TIMEOUT_SECONDS = 30
 MAX_VERIFY_REQUESTS = 120
 
@@ -91,11 +90,15 @@ def get_optional_env(name: str) -> str | None:
 
 # Load Hub config only when a run is allowed to call the external API.
 def load_hub_config(*, required: bool) -> HubConfig | None:
-    if not required and not get_optional_env("AI_DEVS_API_KEY"):
+    if (
+        not required
+        and not get_optional_env("AI_DEVS_API_KEY")
+        and not get_optional_env("HUB_VERIFY_URL")
+    ):
         return None
     return HubConfig(
         api_key=get_required_env("AI_DEVS_API_KEY"),
-        verify_url=get_optional_env("HUB_VERIFY_URL") or DEFAULT_VERIFY_URL,
+        verify_url=get_required_env("HUB_VERIFY_URL"),
     )
 
 

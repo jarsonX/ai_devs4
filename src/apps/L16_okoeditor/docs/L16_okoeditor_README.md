@@ -132,10 +132,10 @@ Required environment variables:
 | Variable | Purpose |
 | --- | --- |
 | `AI_DEVS_API_KEY` | Authenticates the OKO access-key login step and the central `verify` API writes. |
-| `HUB_VERIFY_URL` | Central write endpoint used for `help`, `update`, and `done`. |
-| `OKO_BASE_URL` | Base URL of the authenticated OKO web interface. |
-| `OKO_OPERATOR_LOGIN` | OKO operator login used for the read session. |
-| `OKO_OPERATOR_PASSWORD` | OKO operator password used for the read session. |
+| `HUB_VERIFY_URL` | Required central write endpoint used for `help`, `update`, and `done`. |
+| `OKO_BASE_URL` | Required base URL of the authenticated OKO web interface. |
+| `OKO_OPERATOR_LOGIN` | Required OKO operator login used for the read session. |
+| `OKO_OPERATOR_PASSWORD` | Required OKO operator password used for the read session. |
 
 Regular app constants in `config.py` should define:
 

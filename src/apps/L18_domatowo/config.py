@@ -13,7 +13,6 @@ load_dotenv()
 
 APP_NAME = "L18_domatowo"
 TASK_NAME = "domatowo"
-DEFAULT_HUB_VERIFY_URL = "https://hub.ag3nts.org/verify"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
 DEFAULT_MAX_REQUESTS = 120
 ACTION_POINT_LIMIT = 300
@@ -114,11 +113,15 @@ def prepare_tls_environment(paths: AppPaths, *, required: bool = False) -> bool:
 
 # Load Hub settings only when a real submit run needs them.
 def load_hub_config(*, required: bool) -> HubConfig | None:
-    if not required and not get_optional_env("AI_DEVS_API_KEY"):
+    if (
+        not required
+        and not get_optional_env("AI_DEVS_API_KEY")
+        and not get_optional_env("HUB_VERIFY_URL")
+    ):
         return None
     return HubConfig(
         api_key=get_required_env("AI_DEVS_API_KEY"),
-        verify_url=get_optional_env("HUB_VERIFY_URL") or DEFAULT_HUB_VERIFY_URL,
+        verify_url=get_required_env("HUB_VERIFY_URL"),
     )
 
 

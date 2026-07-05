@@ -51,7 +51,7 @@ Saved runtime artifacts:
 
 ### Tool Discovery Contract
 
-Observed facts about `https://hub.ag3nts.org/api/toolsearch`:
+Observed facts about the configured `HUB_TOOLSEARCH_URL` endpoint:
 
 | Topic | Finding |
 | --- | --- |

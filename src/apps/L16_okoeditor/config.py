@@ -13,8 +13,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(dotenv_path=REPO_ROOT / ".env")
 
 TASK_NAME = "okoeditor"
-DEFAULT_OKO_BASE_URL = "https://hub.ag3nts.org/oko/"
-DEFAULT_VERIFY_URL = "https://hub.ag3nts.org/verify"
 REQUEST_TIMEOUT_SECONDS = 30
 MAX_PAGE_FETCHES = 32
 MAX_PLANNED_WRITES = 3
@@ -104,29 +102,35 @@ def get_optional_env(name: str) -> str | None:
 
 # Load verify API config only when a run is allowed to call the external API.
 def load_verify_api_config(*, required: bool) -> VerifyApiConfig | None:
-    if not required and not get_optional_env("AI_DEVS_API_KEY"):
+    if (
+        not required
+        and not get_optional_env("AI_DEVS_API_KEY")
+        and not get_optional_env("HUB_VERIFY_URL")
+    ):
         return None
 
     return VerifyApiConfig(
         api_key=get_required_env("AI_DEVS_API_KEY"),
-        verify_url=get_optional_env("HUB_VERIFY_URL") or DEFAULT_VERIFY_URL,
+        verify_url=get_required_env("HUB_VERIFY_URL"),
     )
 
 
 # Load OKO web config only when a run is allowed to use the external session.
 def load_oko_web_config(*, required: bool) -> OkoWebConfig | None:
-    if not required and not get_optional_env("AI_DEVS_API_KEY"):
+    if (
+        not required
+        and not get_optional_env("AI_DEVS_API_KEY")
+        and not get_optional_env("OKO_BASE_URL")
+        and not get_optional_env("OKO_OPERATOR_LOGIN")
+        and not get_optional_env("OKO_OPERATOR_PASSWORD")
+    ):
         return None
 
-    operator_login = get_optional_env("OKO_OPERATOR_LOGIN") or "Zofia"
-    operator_password = get_optional_env("OKO_OPERATOR_PASSWORD") or "Zofia2026!"
-    access_key = get_required_env("AI_DEVS_API_KEY")
-
     return OkoWebConfig(
-        base_url=(get_optional_env("OKO_BASE_URL") or DEFAULT_OKO_BASE_URL).rstrip("/") + "/",
-        operator_login=operator_login,
-        operator_password=operator_password,
-        access_key=access_key,
+        base_url=get_required_env("OKO_BASE_URL").rstrip("/") + "/",
+        operator_login=get_required_env("OKO_OPERATOR_LOGIN"),
+        operator_password=get_required_env("OKO_OPERATOR_PASSWORD"),
+        access_key=get_required_env("AI_DEVS_API_KEY"),
     )
 
 
@@ -191,12 +195,12 @@ def build_safe_config_summary(config: AppConfig) -> dict[str, object]:
         "verify_api": {
             "loaded": config.verify_api is not None,
             "api_key": "configured" if config.verify_api else "not_loaded",
-            "verify_url": config.verify_api.verify_url if config.verify_api else None,
+            "verify_url": "configured" if config.verify_api else "not_loaded",
         },
         "oko_web": {
             "loaded": config.oko_web is not None,
-            "base_url": config.oko_web.base_url if config.oko_web else None,
-            "operator_login": config.oko_web.operator_login if config.oko_web else None,
+            "base_url": "configured" if config.oko_web else "not_loaded",
+            "operator_login": "configured" if config.oko_web else "not_loaded",
             "operator_password": "configured" if config.oko_web else "not_loaded",
             "access_key": "configured" if config.oko_web else "not_loaded",
         },

@@ -13,8 +13,6 @@ load_dotenv()
 
 APP_NAME = "L15_savethem"
 TASK_NAME = "savethem"
-HUB_BASE_URL = "https://hub.ag3nts.org"
-TOOLSEARCH_URL = f"{HUB_BASE_URL}/api/toolsearch"
 DEFAULT_OPENAI_MODEL = "gpt-5-mini"
 DEFAULT_REASONING_EFFORT = "low"
 DEFAULT_MAX_ITERATIONS = 20
@@ -160,12 +158,20 @@ def load_llm_config(*, required: bool) -> LlmConfig | None:
 
 # Load course API settings for discovery and optional verification.
 def load_external_api_config(*, required: bool) -> ExternalApiConfig | None:
-    if not required and not get_optional_env("AI_DEVS_API_KEY"):
+    if (
+        not required
+        and not get_optional_env("HUB_BASE_URL")
+        and not get_optional_env("HUB_TOOLSEARCH_URL")
+    ):
         return None
+
+    hub_base_url = get_required_env("HUB_BASE_URL").rstrip("/")
+
     return ExternalApiConfig(
         api_key=get_required_env("AI_DEVS_API_KEY"),
-        hub_base_url=HUB_BASE_URL,
-        toolsearch_url=TOOLSEARCH_URL,
+        hub_base_url=hub_base_url,
+        toolsearch_url=get_optional_env("HUB_TOOLSEARCH_URL")
+        or f"{hub_base_url}/api/toolsearch",
         verify_url=get_optional_env("HUB_VERIFY_URL"),
     )
 
@@ -231,7 +237,8 @@ def build_safe_config_summary(config: AppConfig) -> dict[str, object]:
         "external_api": {
             "loaded": config.external_api is not None,
             "api_key": "configured" if config.external_api else "not_loaded",
-            "toolsearch_url": config.external_api.toolsearch_url if config.external_api else None,
+            "hub_base_url": "configured" if config.external_api else "not_loaded",
+            "toolsearch_url": "configured" if config.external_api else "not_loaded",
             "verify_url": "configured" if config.external_api and config.external_api.verify_url else "not_loaded",
         },
         "runtime": {

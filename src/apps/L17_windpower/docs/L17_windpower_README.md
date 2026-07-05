@@ -72,7 +72,7 @@ flowchart TD
 | Variable | Purpose |
 | --- | --- |
 | `AI_DEVS_API_KEY` | Authenticates Hub requests. |
-| `HUB_VERIFY_URL` | Hub verification endpoint. If omitted, the app uses the default Hub `/verify` URL. |
+| `HUB_VERIFY_URL` | Required Hub verification endpoint loaded from `.env`. |
 
 ## Run
 

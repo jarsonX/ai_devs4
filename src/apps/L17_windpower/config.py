@@ -14,7 +14,6 @@ load_dotenv(dotenv_path=REPO_ROOT / ".env")
 
 APP_NAME = "L17_windpower"
 TASK_NAME = "windpower"
-DEFAULT_VERIFY_URL = "h" + "ttps://" + "hub." + "ag3nts." + "org" + "/verify"
 REQUEST_TIMEOUT_SECONDS = 20
 SERVICE_WINDOW_SECONDS = 40
 LOCAL_DEADLINE_SECONDS = 38
@@ -93,12 +92,16 @@ def get_optional_env(name: str) -> str | None:
 
 # Load Hub config only when a run is allowed to call the external API.
 def load_hub_config(*, required: bool) -> HubConfig | None:
-    if not required and not get_optional_env("AI_DEVS_API_KEY"):
+    if (
+        not required
+        and not get_optional_env("AI_DEVS_API_KEY")
+        and not get_optional_env("HUB_VERIFY_URL")
+    ):
         return None
 
     return HubConfig(
         api_key=get_required_env("AI_DEVS_API_KEY"),
-        verify_url=get_optional_env("HUB_VERIFY_URL") or DEFAULT_VERIFY_URL,
+        verify_url=get_required_env("HUB_VERIFY_URL"),
     )
 
 
@@ -161,7 +164,7 @@ def build_safe_config_summary(config: AppConfig) -> dict[str, object]:
         "hub": {
             "loaded": config.hub is not None,
             "api_key": "configured" if config.hub else "not_loaded",
-            "verify_url": config.hub.verify_url if config.hub else None,
+            "verify_url": "configured" if config.hub else "not_loaded",
             "task_name": config.hub.task_name if config.hub else TASK_NAME,
         },
     }

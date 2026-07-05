@@ -70,7 +70,7 @@ flowchart TD
 | Name | Purpose |
 | --- | --- |
 | `AI_DEVS_API_KEY` | Secret API key used only in Hub requests. |
-| `HUB_VERIFY_URL` | Optional Hub verification endpoint override. |
+| `HUB_VERIFY_URL` | Required Hub verification endpoint loaded from `.env`. |
 
 Stable runtime settings, such as request timeout and request guard limits, live
 in `src/apps/L20_foodwarehouse/config.py`.
