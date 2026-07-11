@@ -18,13 +18,14 @@
 - [Verification](#verification)
 - [Limitations And Open Questions](#limitations-and-open-questions)
 - [LLM Usage And Reviews](#llm-usage-and-reviews)
+- [LLM Design Checklist Review](#llm-design-checklist-review)
 - [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
-`L22_phonecall` is planned to solve the `phonecall` course task.
-The app must start a Hub phone-call session, talk to a Polish-speaking operator
-through audio messages, learn which road can be used, and then request that
+`L22_phonecall` solves the `phonecall` course task.
+The app starts a Hub phone-call session, talks to a Polish-speaking operator
+through audio messages, learns which road can be used, and then requests that
 monitoring be disabled for the passable road or roads.
 
 The learning goal is controlled dynamic voice automation. The bot must generate
@@ -39,12 +40,26 @@ assistant audio message is generated from the approved text for the current turn
 
 ## Current Status
 
-This README records the planned design only.
+This README records the implemented app and the live-solve status.
 
-No application source modules have been implemented yet. The LLM design review
-is still pending, so implementation must not start until the checklist gate
-passes for the scope described here. Discovery, README edits, and design review
-work are allowed before that gate.
+The local app is implemented: package skeleton, config loading, shared models,
+CLI modes, deterministic state machine, utterance guard, fallback utterances,
+runtime artifact logger, guarded Hub verify client, transcript interpreter,
+response planner, audio gateway, OpenAI SDK adapter, Hub response normalizer,
+live inspection helpers, and workbench regression tests.
+
+The bounded live inspection workflow completed the task successfully. Operator
+audio confirmed monitoring was disabled, and Hub returned a flag in runtime
+artifacts under `data/L22_phonecall/calls/20260711T083231570349Z/`. During live
+debugging the assistant wording was adjusted for STT/TTS reality: `Tymon` is
+spelled aloud, the password is sent as lowercase `barbakan`, the reason mentions
+`tajny transport jedzenia dla Zygfryda`, and the monitoring request names the
+secret operation ordered by Zygfryd.
+
+Full one-command `--submit` orchestration remains a follow-up; the successful
+run used guarded inspection commands. Any larger architecture, data-flow, or
+LLM-scope change requires updating this README and rerunning the design
+checklist.
 
 ## Core Design
 
@@ -267,7 +282,7 @@ same speech act. If no safe fallback exists, the call must stop or restart.
 
 Every run must produce both readable text and playable audio artifacts.
 
-Planned runtime layout:
+Runtime layout:
 
 ```text
 data/L22_phonecall/
@@ -294,6 +309,8 @@ Logging rules:
 - Save operator audio when Hub returns audio.
 - Save assistant audio for every message sent to Hub.
 - Save transcripts as plain text for quick review.
+- Add the run mode to `call_report.json` and `call_transcript.md` so local
+  fixture runs are not confused with approved live inspection calls.
 - Save model interpretation and planning outputs as JSON.
 - Save masked Hub requests; never write the raw API key outside `.env`.
 - Preserve full Hub responses under `data/L22_phonecall/...` when useful for
@@ -308,6 +325,10 @@ The app should also create a compact Markdown transcript:
 
 ```md
 # L22 Phonecall Transcript
+
+Call ID: `20260711T143012Z`
+
+Mode: `dry-run`
 
 ## Turn 001
 
@@ -324,6 +345,10 @@ Audio:
 - operator: `turn_001/operator.audio.mp3`
 - assistant: `turn_001/assistant.audio.mp3`
 ```
+
+For manual live-inspection workflows, the compact transcript is rebuilt from
+persisted `turn_NNN` artifacts after each step. This prevents one manually sent
+speech act from overwriting the human-readable history of the whole call.
 
 ## Data Flow
 
@@ -351,9 +376,10 @@ Secrets and external endpoints belong in `.env`.
 | `HUB_VERIFY_URL` | Hub verification endpoint, expected to point at `/verify`. |
 | `OPENAI_API_KEY` | Secret API key used for OpenAI STT, interpretation, planning, and TTS calls. |
 
-Stable runtime settings should live in `config.py`, not `.env`.
+Stable runtime settings live in `config.py`, with optional app-specific
+environment overrides for model names and limits.
 
-| Setting | Planned purpose |
+| Setting | Purpose |
 | --- | --- |
 | `TASK_NAME` | `phonecall`. |
 | `MAX_HUB_REQUESTS` | Hard cap for one call attempt. |
@@ -371,38 +397,71 @@ Stable runtime settings should live in `config.py`, not `.env`.
 | `TTS_MODEL` | OpenAI model used for text-to-speech. |
 | `TTS_VOICE` | Voice used for assistant audio. |
 
-Before implementation, confirm the current OpenAI audio model names against the
-official OpenAI docs and keep them as app-level constants unless a runtime
-override is deliberately needed.
+Current default model names are defined in `config.py`; override them only with
+`L22_PHONECALL_*` environment variables when an intentional runtime test needs
+different models.
 
 ## Run
 
-Planned local commands:
+Local commands:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --dry-run
 ```
 
-`--dry-run` should exercise the state machine with fixture transcripts and must
-not call Hub or OpenAI.
+`--dry-run` exercises the state machine with fixture transcripts and does not
+call Hub or OpenAI.
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --simulate-audio
 ```
 
-`--simulate-audio` may use local fixture audio and fake clients to verify STT,
+`--simulate-audio` uses local fixture audio and fake clients to verify STT,
 logging, and TTS file handling without real external calls.
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --inspect-live
+```
+
+`--inspect-live` sends exactly one guarded Hub `start` request and stores the
+raw response under `data/L22_phonecall/calls/{call_id}/`. It requires explicit
+approval before execution.
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --inspect-live-first-turn
+```
+
+`--inspect-live-first-turn` sends a guarded live start plus one generated
+assistant audio turn. It requires Hub and OpenAI credentials and explicit
+approval before execution.
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --inspect-transcribe-operator --call-id <call_id> --turn-number <n>
+```
+
+`--inspect-transcribe-operator` transcribes a saved operator audio artifact for
+one call directory. It requires OpenAI credentials and explicit approval before
+execution.
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --inspect-send-speech-act --call-id <call_id> --turn-number <n> --speech-act <act> --roads RD820
+```
+
+`--inspect-send-speech-act` sends one code-approved speech act as generated
+audio for an existing call. This was the live debugging path used to complete
+the task.
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --submit
 ```
 
-`--submit` starts the real Hub call and may make real OpenAI requests. It
-requires explicit approval before execution.
+`--submit` is intentionally still blocked. It returns `approval_required`
+without external calls; converting the bounded inspection workflow into a
+single end-to-end submit mode is the remaining automation follow-up.
 
 ## Main Modules
 
-Planned modules after the design gate passes:
+Implemented modules:
 
 | Module | Responsibility |
 | --- | --- |
@@ -410,19 +469,38 @@ Planned modules after the design gate passes:
 | `models.py` | Define typed turn, state, interpretation, speech act, artifact, and report objects. |
 | `verify_client.py` | Send guarded Hub `start` and audio turn requests with masked logging. |
 | `audio_gateway.py` | Own OpenAI STT and TTS calls behind guarded methods. |
+| `openai_gateway.py` | Adapt the OpenAI SDK to audio, interpreter, and planner protocols. |
+| `hub_response.py` | Normalize Hub response shapes discovered during live inspection. |
 | `conversation_interpreter.py` | Convert transcripts into strict structured turn summaries. |
 | `state_machine.py` | Enforce legal conversation transitions and choose allowed speech acts. |
 | `response_planner.py` | Generate or template one short utterance for an approved speech act. |
 | `utterance_guard.py` | Validate assistant text before TTS. |
 | `run_log.py` | Persist per-turn text, audio, JSON artifacts, and final reports. |
 | `workflow.py` | Coordinate dry-run, simulation, and submit modes. |
+| `live_inspection.py` | Provide bounded live helper commands used for approved inspection and solve steps. |
 | `main.py` | Provide the CLI entrypoint. |
 
-No module above is implemented yet.
+Implemented workbench tests:
+
+- `workbench/test_state_and_guards.py`
+- `workbench/test_run_log.py`
+- `workbench/test_verify_client.py`
+- `workbench/test_conversation_interpreter.py`
+- `workbench/test_response_planner.py`
+- `workbench/test_audio_gateway.py`
+- `workbench/test_workflow.py`
+- `workbench/test_openai_gateway.py`
+- `workbench/test_hub_response.py`
+- `workbench/test_live_inspection.py`
+
+Follow-up work:
+
+- Convert the guarded inspection sequence into full one-command `--submit`
+  orchestration.
 
 ## Verification
 
-Planned checks before any live Hub submission:
+Useful checks before reusing or extending the live workflow:
 
 1. Unit test the state machine transitions with representative operator turns.
 2. Unit test the utterance guard against forbidden content, wrong road IDs,
@@ -435,46 +513,132 @@ Planned checks before any live Hub submission:
    one passable road, multiple passable roads, and failed-call scenarios.
 7. Run a fake-client `--simulate-audio` check to confirm MP3 artifacts are saved
    and base64 is generated only for transport.
-8. Run live `--submit` only after explicit approval for Hub and OpenAI calls.
+8. Keep live Hub/OpenAI calls approval-gated unless a new explicit execution
+   plan is accepted.
 
 Latest verification:
 
 | Date | Command | Result |
 | --- | --- | --- |
 | 2026-07-11 | README design creation only | No runtime verification performed. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -c "import src.apps.L22_phonecall; print('import ok')"` | Passed. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --help` | Passed. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --dry-run` | Passed; no Hub/OpenAI secret-bearing config loaded. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m unittest src.apps.L22_phonecall.workbench.test_state_and_guards` | Passed; 10 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m unittest src.apps.L22_phonecall.workbench.test_state_and_guards src.apps.L22_phonecall.workbench.test_run_log` | Passed; 11 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m unittest src.apps.L22_phonecall.workbench.test_state_and_guards src.apps.L22_phonecall.workbench.test_run_log src.apps.L22_phonecall.workbench.test_verify_client` | Passed; 16 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m unittest src.apps.L22_phonecall.workbench.test_state_and_guards src.apps.L22_phonecall.workbench.test_run_log src.apps.L22_phonecall.workbench.test_verify_client src.apps.L22_phonecall.workbench.test_conversation_interpreter` | Passed; 24 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m unittest src.apps.L22_phonecall.workbench.test_state_and_guards src.apps.L22_phonecall.workbench.test_run_log src.apps.L22_phonecall.workbench.test_verify_client src.apps.L22_phonecall.workbench.test_conversation_interpreter src.apps.L22_phonecall.workbench.test_response_planner` | Passed; 29 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m unittest src.apps.L22_phonecall.workbench.test_state_and_guards src.apps.L22_phonecall.workbench.test_run_log src.apps.L22_phonecall.workbench.test_verify_client src.apps.L22_phonecall.workbench.test_conversation_interpreter src.apps.L22_phonecall.workbench.test_response_planner src.apps.L22_phonecall.workbench.test_audio_gateway` | Passed; 34 tests. |
+| 2026-07-11 | full local unittest suite through `src.apps.L22_phonecall.workbench.test_workflow` | Passed; 37 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --dry-run` | Passed; completed local fixture workflow to `MONITORING_CONFIRMED`. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --simulate-audio` | Passed; completed fake STT/TTS workflow to `MONITORING_CONFIRMED`. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --submit` | Passed; returned `approval_required` without external calls. |
+| 2026-07-11 | full local unittest suite with password, reason, and failure workflow regressions | Passed; 40 tests. |
+| 2026-07-11 | full local unittest suite with fake OpenAI SDK adapter tests | Passed; 44 tests. |
+| 2026-07-11 | full local unittest suite with fake live-start inspection test | Passed; 45 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --help` | Passed; shows `--inspect-live`. |
+| 2026-07-11 | approved `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --inspect-live` | Passed; one Hub `start` request, HTTP 200, response keys recorded in runtime data. |
+| 2026-07-11 | full local unittest suite with Hub response normalization tests | Passed; 49 tests. |
+| 2026-07-11 | bounded live solve through guarded inspection commands | Passed; Hub returned a flag and operator confirmed monitoring disabled; artifacts under `data/L22_phonecall/calls/20260711T083231570349Z/`. |
+| 2026-07-11 | full local unittest suite after live fixes | Passed; 56 tests. |
+| 2026-07-11 | full local unittest suite after transcript logging fix | Passed; 57 tests. |
+| 2026-07-11 | `.\venv\Scripts\python.exe -m src.apps.L22_phonecall.main --dry-run` after live fixes | Passed; completed local fixture workflow to `MONITORING_CONFIRMED`. |
 
 ## Limitations And Open Questions
 
-- The exact Hub response shape after `start` and after each audio turn still
-  needs live inspection or careful fake-client testing.
+- Full one-command `--submit` orchestration is not wired yet. The successful
+  solve used guarded inspection modes.
+- The Hub response shape is now known for the inspected path, but future Hub
+  behavior can still vary. `hub_response.py` owns normalization for the shapes
+  discovered so far.
 - Operator answers may include indirect road status wording. The interpreter
-  must handle phrases such as "the last one is clear" without guessing when the
-  reference is ambiguous.
-- The task says to disable monitoring on roads that are passable. The workflow
-  should support one or more passable roads, even if the final course answer is
-  likely one specific route.
-- If the operator asks for the password before giving road status, the state
-  machine must provide `BARBAKAN` and then continue the same scenario.
+  handles the live phrasing observed for `RD-820`, but ambiguous references
+  should still trigger clarification rather than guessing.
+- The workflow supports one or more passable roads, even though the successful
+  live solve selected `RD820`.
 - If STT confidence is low or interpretation is contradictory, the bot should
   ask one short clarification or restart, depending on the failure type.
-- The final implementation must decide whether response wording needs a planner
-  model on every turn or whether deterministic templates are enough for some
-  speech acts.
 
 ## LLM Usage And Reviews
 
 | Area | Status | Evidence |
 | --- | --- | --- |
-| LLM usage | Yes | The planned app uses OpenAI STT, structured interpretation, optional response planning, and TTS for dynamic audio conversation. |
-| Design review | Pending | `_agent/instructions/llm_design_checklist.md`; scope: L22 phonecall MVP dynamic chained voice pipeline with state-machine-controlled conversation, logging, STT, interpreter, planner, utterance guard, TTS, and guarded Hub submission; result: pending; boundary: no source implementation until PASS. |
-| Optimization review | Pending | `_agent/instructions/llm_optimization_checklist.md`; required after implementation or any material LLM workflow change before declaring the app complete. |
+| LLM usage | Yes | The app uses OpenAI STT, structured interpretation, optional response planning, and TTS for dynamic audio conversation. |
+| Design review | Passed | `_agent/instructions/llm_design_checklist.md`; 2026-07-11; mode: non-production; scope: L22 phonecall MVP dynamic chained voice pipeline with state-machine-controlled conversation, logging, STT, interpreter, planner, utterance guard, TTS, and guarded Hub submission; result: PASS; boundary: implemented MVP modules only. |
+| Optimization review | Passed | `_agent/instructions/llm_optimization_checklist.md`; 2026-07-11; scope: L22 phonecall local workflow, OpenAI adapters, and guarded live inspection solve; mode: non-production; result: PASS; follow-up: convert bounded inspection sequence into one-command `--submit` orchestration before reuse. |
+
+## LLM Design Checklist Review
+
+Review mode: `non-production`.
+
+Scope: L22 phonecall MVP dynamic chained voice pipeline with
+state-machine-controlled conversation, logging, STT, interpreter, planner,
+utterance guard, TTS, and guarded Hub submission.
+
+Result: PASS. There are no blocking `NO` items for this design scope.
+
+### Scope And Workflow
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| The application has a clearly defined goal and expected output. | YES | Purpose and workflow define the goal: complete the `phonecall` task by identifying passable road status and requesting monitoring disablement through Hub audio turns. |
+| The workflow is split into small steps when one model call would mix multiple responsibilities. | YES | Core design separates Hub I/O, audio transcription, structured interpretation, state-machine transition, utterance planning, utterance guard, TTS, and logging. |
+| Deterministic code owns stable logic, and LLM calls are reserved for language or reasoning tasks. | YES | State transitions, allowed actions, payload shape, masking, request guards, artifact paths, and utterance validation are code-owned; models handle STT, interpretation, optional wording, and TTS. |
+| Each workflow step has a clear purpose. | YES | Main Modules assigns one responsibility to each module: config, models, verify client, audio gateway, interpreter, state machine, planner, guard, logger, workflow, and CLI. |
+
+### Model And Prompt Plan
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Each LLM step has a reason for using a model instead of ordinary code. | YES | STT and TTS are audio model tasks; interpretation handles flexible Polish operator wording; optional planner handles short wording only when deterministic templates are insufficient. |
+| The selected model for each step matches the expected difficulty of that step. | YES | `config.py` defines separate STT, interpreter, planner, and TTS model constants with optional app-specific overrides. |
+| Prompts are short, focused, and limited to the current step. | YES | Speech Contracts define narrow interpreter and planner inputs; planner receives one approved speech act, not full workflow authority. |
+| Token usage is intentionally limited for both model input and model output. | YES | Interpreter consumes one transcript turn, planner returns one short utterance, and `MAX_UTTERANCE_WORDS` plus request guards cap usage. |
+| Structured outputs are used wherever code consumes the result. | YES | Interpreter and planner contracts require strict JSON, and downstream state-machine logic consumes validated fields only. |
+
+### Context And Tools
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| The design limits context to only what the current step needs. | YES | The interpreter sees the current transcript plus needed state context; planner sees only a narrow speech-act input and constraints. |
+| The design limits tool exposure to only the tools needed for the current step. | YES | Models have no direct Hub, filesystem, or network authority; code-owned gateways perform Hub, STT, and TTS calls. |
+| The design avoids passing full history, full datasets, or irrelevant examples by default. | YES | Full raw Hub responses and artifacts are persisted under `data/L22_phonecall/...`; model steps use compact per-turn context. |
+| The workflow includes batching, caching, or persisted intermediate results where repeated or long-running calls are likely. | YES | Logging And Artifacts requires per-turn raw responses, audio, transcripts, interpretation, plans, utterances, and final reports. |
+
+### Runtime Performance And Task Lifecycle
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Production-only: Long-running LLM, tool, media generation, or agent tasks have a progress or heartbeat mechanism. | N/A | Non-production local course app; no deployed user-facing long-running task runner exists. |
+| Production-only: The user can understand what is happening while waiting for slow model, tool, media generation, or agent work. | N/A | Non-production CLI workflow; per-turn logs and terminal output are sufficient for local use. |
+| Production-only: Long-running work can continue safely if the user closes the browser, loses connection, or leaves the application. | N/A | Non-production local CLI run; resumable production execution is out of scope. |
+| Production-only: The workflow defines how task state, intermediate outputs, and final results are persisted. | N/A | Production guarantee is out of scope, but the MVP still persists all turn artifacts and final reports under `data/L22_phonecall/...`. |
+| Production-only: The design supports pausing and resuming tasks when waiting for user approval, tool results, retries, or agent completion. | N/A | Non-production CLI app; user approvals happen before live modes and each call attempt is a bounded local run. |
+| Production-only: User interaction during long-running work exists, such as message queueing, cancellation, or opening a separate thread. | N/A | No production UI or queue exists. |
+| Production-only: UI state is not tightly coupled to backend execution state for long-running tasks. | N/A | No UI exists. |
+| Production-only: Event-driven or job-based orchestration is considered where a synchronous request/response flow would be fragile. | N/A | Hub conversation is turn-based and bounded; synchronous CLI orchestration is acceptable for this exercise. |
+
+### Validation And Safety
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| The design includes validation before model output is used downstream. | YES | Interpreter output is schema-validated before state-machine use; planner output must pass `utterance_guard.py` before TTS. |
+| The design treats model output as untrusted until validation passes. | YES | Model Role forbids models from choosing speech acts or calling Hub; state machine and guard own downstream authority. |
+| The design keeps authorization, permissions, and risky actions outside the model. | YES | Hub requests, API key handling, request guards, and live-call approvals are code-owned and outside model control. |
+| The workflow handles missing required inputs without guessing important values. | YES | Unknown road statuses remain `unknown`; ambiguous or low-confidence interpretations trigger clarification, failure, or restart rather than guessed monitoring requests. |
 
 ## What This Task Should Teach
 
-This section is not final yet because the app is still in design.
-
-The planned lesson is that a useful voice agent is not just a model with a
+The main lesson is that a useful voice agent is not just a model with a
 speaker. It is a controlled loop: audio in, transcript, structured
 interpretation, deterministic state, guarded utterance, audio out, and a full
-audit trail. The model gives the bot language and voice; code gives it memory,
-boundaries, and enough discipline not to ruin the call in the first two turns.
+audit trail.
+
+The live run showed why this matters. The hard part was not only generating
+speech; it was correcting wording after real STT/TTS behavior, preserving every
+operator and assistant artifact, and keeping the model inside a narrow job while
+code owned the task order, road selection, password handling, and final
+monitoring request. The model gives the bot language and voice; code gives it
+memory, boundaries, and enough discipline to finish the call without blurting
+out the wrong objective.
