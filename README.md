@@ -8,6 +8,7 @@ This repository is both a learning workspace and a portfolio of applied AI engin
 
 - [About the course](#about-the-course)
 - [Repository structure](#repository-structure)
+- [Applications](#applications)
 - [Learning approach](#learning-approach)
   - [Human-AI collaboration](#human-ai-collaboration)
   - [Agent knowledge base availability](#agent-knowledge-base-availability)
@@ -32,6 +33,39 @@ The repository also includes applications labeled as `EDU#`. These are not direc
 Application documentation is kept close to the code in each app's `docs/` directory. README files describe the current purpose, workflow, configuration, run command, module structure, and verification approach for an app. Some apps also include DEV_NOTES files with working context such as implementation history, debugging lessons, trade-offs, open questions, future work, and lessons learned.
 
 Runtime data, generated outputs, logs, cache files, downloaded references, and similar artifacts are intentionally kept outside application source directories whenever practical, usually under the repository-level `data/` directory. This keeps application code focused on implementation and documentation, while runtime artifacts remain separated by purpose.
+
+## Applications
+
+Course task applications:
+
+- [`L1_people`](src/apps/L1_people/)
+- [`L2_findhim`](src/apps/L2_findhim/)
+- [`L3_proxy`](src/apps/L3_proxy/)
+- [`L4_sendit`](src/apps/L4_sendit/)
+- [`L5_railway`](src/apps/L5_railway/)
+- [`L6_categorize`](src/apps/L6_categorize/)
+- [`L7_electricity`](src/apps/L7_electricity/)
+- [`L8_failure`](src/apps/L8_failure/)
+- [`L9_mailbox`](src/apps/L9_mailbox/)
+- [`L10_drone`](src/apps/L10_drone/)
+- [`L11_evaluation`](src/apps/L11_evaluation/)
+- [`L12_firmware`](src/apps/L12_firmware/)
+- [`L13_reactor`](src/apps/L13_reactor/)
+- [`L14_negotiations`](src/apps/L14_negotiations/)
+- [`L15_savethem`](src/apps/L15_savethem/)
+- [`L16_okoeditor`](src/apps/L16_okoeditor/)
+- [`L17_windpower`](src/apps/L17_windpower/)
+- [`L18_domatowo`](src/apps/L18_domatowo/)
+- [`L19_filesystem`](src/apps/L19_filesystem/)
+- [`L20_foodwarehouse`](src/apps/L20_foodwarehouse/)
+- [`L21_radiomonitoring`](src/apps/L21_radiomonitoring/)
+- [`L22_phonecall`](src/apps/L22_phonecall/)
+- [`L23_shellaccess`](src/apps/L23_shellaccess/)
+- [`L24_goingthere`](src/apps/L24_goingthere/)
+
+Educational side applications:
+
+- [`EDU1`](src/apps/EDU1/)
 
 ## Learning approach
 
