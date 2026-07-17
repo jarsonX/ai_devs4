@@ -17,8 +17,8 @@ Selected from `_agent/references/INDEX.md`:
 
 | Reference | Use |
 | --- | --- |
-| `L14_AI_Assisted_Tool_Interface_Design.md` | Keep the external tool contract narrow, explicit, and driven by real task constraints. |
-| `L14_Tool_Contract_Evaluation_and_Stateful_Scenarios.md` | Design verification around tool behavior and failure cases, not only happy-path answers. |
+| `L14_ai_assisted_tool_interface_design.md` | Keep the external tool contract narrow, explicit, and driven by real task constraints. |
+| `L14_tool_contract_evaluation_and_stateful_scenarios.md` | Design verification around tool behavior and failure cases, not only happy-path answers. |
 | `L7_hybrid_retrieval_and_rag_effectiveness.md` | Sanity-check whether retrieval complexity is justified; for this task direct local search is enough. |
 | `_agent/instructions/llm_design_gate.md` | Required before implementing an LLM-based Polish query interpreter or any model-call schema. |
 

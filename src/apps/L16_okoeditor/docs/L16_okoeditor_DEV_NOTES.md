@@ -17,7 +17,7 @@ Selected from `_agent/references/INDEX.md`:
 | Reference | Use |
 | --- | --- |
 | `L3_api_constraint_audit_and_tool_wrapping.md` | Audit the raw API before designing the internal app contract. |
-| `L12_AI_Scope_and_Automation_Boundaries.md` | Keep the final app deterministic instead of building another runtime LLM explorer with little extra learning value. |
+| `L12_ai_scope_and_automation_boundaries.md` | Keep the final app deterministic instead of building another runtime LLM explorer with little extra learning value. |
 | `_agent/instructions/external_api_safety.md` | Keep external exploration bounded, guarded, and TLS-prepared. |
 | `_agent/instructions/course_runtime_data_and_leak_checks.md` | Avoid leaking raw course data, full responses, or credentials into docs. |
 

@@ -48,7 +48,7 @@ Selected from `_agent/references/INDEX.md`:
 | `L5_performance_cost_and_rate_limits.md` | Bound model calls, tokens, retries, and API calls. |
 | `L6_agentic_rag_and_context_gathering.md` | Plan observation-driven exploration. |
 | `L7_external_context_safety_and_rag_risks.md` | Treat VM content as untrusted data. |
-| `L12_AI_Scope_and_Automation_Boundaries.md` | Keep the agent narrow and deterministic where possible. |
+| `L12_ai_scope_and_automation_boundaries.md` | Keep the agent narrow and deterministic where possible. |
 
 ## Design Decisions
 
