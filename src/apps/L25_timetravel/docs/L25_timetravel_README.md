@@ -5,8 +5,9 @@ AI agents will operate the Hub API and the browser preview, while ordinary
 Python will own workflow state, safety rules, calculations, and permission to
 activate the time machine.
 
-The application is currently in the design and discovery stage. It has no
-runnable source implementation yet.
+The application has completed safe API and UI discovery. It has no runnable
+source implementation yet; the LLM design review is the next implementation
+gate.
 
 ## Table Of Contents
 
@@ -17,6 +18,8 @@ runnable source implementation yet.
 - [Workflow](#workflow)
 - [Mermaid Logic Flow](#mermaid-logic-flow)
 - [Travel Plan](#travel-plan)
+- [API Exploration Results](#api-exploration-results)
+- [UI Exploration Results](#ui-exploration-results)
 - [Deterministic Safety Boundary](#deterministic-safety-boundary)
 - [SQLite Coordination](#sqlite-coordination)
 - [Browser Automation](#browser-automation)
@@ -53,17 +56,17 @@ The machine documentation at
 | Area | Status | Notes |
 | --- | --- | --- |
 | Architecture | Accepted for documentation | Two narrow AI agents plus one deterministic supervisor. |
-| App README | Complete | This document records the design before discovery and implementation. |
+| App README | Current through API and UI discovery | The design and both observed external contracts are documented. |
 | Python source | Not started | Source implementation is blocked until the LLM design review passes. |
-| Hub API exploration | Pending | No real Hub request has been made for this app. |
-| Preview UI exploration | Pending | DOM selectors and success signals are not known yet. |
+| Hub API exploration | Complete for safe scope | Help, configuration, validation, stabilization, and mode rotation were inspected without activation or reset. |
+| Preview UI exploration | Complete for non-activating scope | Authentication, DOM selectors, control persistence, readiness signals, and safe restoration were verified without travel or reset. |
 | SQLite | Available | Python 3.11 includes `sqlite3`; local SQLite version observed as 3.45.1. |
-| Browser library | Missing | Playwright is not yet installed in the project virtual environment. |
-| Browser engine | Available | Microsoft Edge is installed locally. |
+| Browser library | Available | Playwright 1.61.0 is installed in the project virtual environment. |
+| Browser engine | Verified against the live preview | Headless Microsoft Edge 150.0.4078.65 authenticated, operated the controls, and restored state successfully. |
 
-The in-app Codex browser was unavailable during design discovery. This does
-not prevent a standalone Python application from controlling a local browser,
-but browser compatibility with the preview must be proven by a smoke test.
+The final application can operate the preview through standalone Python
+Playwright even though the in-app Codex browser was unavailable during early
+design discovery. The live smoke test and reversible control test both passed.
 
 ## Architecture
 
@@ -84,6 +87,12 @@ would add avoidable browser lifecycle and OneDrive file-locking complexity.
 Agents do not send free-form messages directly to one another. They exchange
 validated commands and observations through SQLite. The supervisor remains
 the only authority allowed to advance the workflow or authorize activation.
+
+Live API discovery confirmed that `getConfig` also reports browser-owned
+values such as `PTA`, `PTB`, `PWR`, and `mode`. The Backend Agent can therefore
+independently observe the frontend result even though it cannot change those
+controls. This gives the activation barrier a useful cross-check between the
+two agents.
 
 ## Agent Responsibilities
 
@@ -113,7 +122,7 @@ without a supervisor decision.
 ### Frontend Agent
 
 The Frontend Agent may use only narrow browser tools scoped to the approved
-preview origin:
+preview and authentication hosts:
 
 - inspect the machine state;
 - switch between `standby` and `active`;
@@ -125,6 +134,8 @@ preview origin:
 
 It is responsible for:
 
+- requesting a deterministic login helper to open a fresh authenticated
+  browser context before the agent receives page-control tools;
 - applying the manual controls for the current travel leg;
 - verifying each control after changing it;
 - observing `Flux Density`, device condition, battery state, and activation
@@ -133,8 +144,12 @@ It is responsible for:
 - detecting visible travel, battery replacement, tunnel, failure, and flag
   outcomes.
 
-It cannot call the Hub API, navigate to arbitrary domains, execute arbitrary
-page JavaScript, read credentials, or bypass an expired activation lease.
+It cannot call the Hub API, navigate outside the approved Hub and Easytools
+authentication hosts, execute arbitrary page JavaScript, receive credential
+values in model context, or bypass an expired activation lease. A
+deterministic helper reads `EASYTOOLS_EMAIL` and `EASYTOOLS_PASSWORD` from
+`.env`, selects Easytools password mode, fills the form, and discards the
+browser context at shutdown.
 
 ### Deterministic Supervisor
 
@@ -157,9 +172,9 @@ itself.
 
 ## Workflow
 
-1. Start one run and freeze the present date. Prefer a server-authoritative
-   date if API discovery exposes one; otherwise use the `Europe/Warsaw` local
-   date captured once at startup.
+1. Start one run and freeze the server-authoritative `currentDate` returned by
+   `getConfig`. Use the `Europe/Warsaw` local date only if that field is missing
+   or invalid.
 2. Load and validate the machine rules required for the three planned target
    years.
 3. Request API help and inspect the current backend configuration.
@@ -168,7 +183,8 @@ itself.
 5. Prepare the 2238 jump in `standby`:
    - configure the date through the backend;
    - derive and configure `syncRatio`;
-   - obtain and configure stabilization;
+   - obtain `needConfig`, extract its arithmetic instruction, calculate the
+     result deterministically, and configure stabilization;
    - set `PT-A = off`, `PT-B = on`, and the required `PWR` in the browser.
 6. Switch to `active`, wait for `internalMode = 3`, and require fresh backend
    and frontend readiness observations.
@@ -251,19 +267,185 @@ syncRatio = (weighted modulo 101) / 100
 
 For a run started on July 18, 2026, the expected plan is:
 
-| Leg | Target | PT-A | PT-B | PWR | Required mode | Sync ratio | Expected result |
-| --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| Battery jump | 2238-11-05 | Off | On | 91 | 3 | 0.82 | Arrive in 2238 and receive replacement batteries. |
-| Return | 2026-07-18 | On | Off | 28 | 2 | 0.68 | Return to the frozen present date. |
-| Tunnel | 2024-11-12 | On | On | 19 | 2 | 0.54 | Open the tunnel and obtain the final result. |
+| Leg | Target | PT-A | PT-B | PWR | Required mode | Sync ratio | Stabilization | Expected result |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| Battery jump | 2238-11-05 | Off | On | 91 | 3 | 0.82 | 189 | Arrive in 2238 and receive replacement batteries. |
+| Return | 2026-07-18 | On | Off | 28 | 2 | 0.68 | Dynamic | Return to the frozen present date. |
+| Tunnel | 2024-11-12 | On | On | 19 | 2 | 0.54 | Dynamic | Open the tunnel and obtain the final result. |
 
 The return row is an example for the date observed during design. Production
 logic must calculate the return target, `PWR`, mode, and ratio from the present
 date frozen at run start. It must not hardcode July 18, 2026.
 
-Stabilization is intentionally absent from the table. Its value must be
-obtained dynamically from the Hub hint after the complete target date has been
-configured.
+The observed stabilization hint for November 5, 2238 described the operation
+`900 - 711` in Polish natural language, producing the validated value `189`.
+Other stabilization values must still be obtained dynamically after their
+complete target dates have been configured.
+
+## API Exploration Results
+
+The safe live exploration used 25 guarded Hub requests. It configured the
+backend for the first planned target but did not use `reset`, activate the
+machine, change browser controls, consume battery, or attempt a tunnel.
+
+### Response Contract
+
+| Operation | HTTP status | Domain code | Observed result |
+| --- | ---: | ---: | --- |
+| `help` | 200 | 14 | Returns actions, configurable fields, ranges, and the preview location. |
+| `getConfig` | 200 | 12 | Returns the complete current machine snapshot. |
+| valid `configure` | 200 | 11 | Applies one field and returns the updated snapshot. |
+| unsupported parameter | 400 | -950 | Rejects fields outside the five API-editable parameters. |
+| day outside `1-31` | 400 | -920 | Rejects the value without changing the previous valid state. |
+| ratio inconsistent with the formula | 400 | -780 | Rejects the value without changing the previous valid state. |
+
+The API accepts only:
+
+- `day`: `1-31`;
+- `month`: `1-12`;
+- `year`: `1500-2499`;
+- `syncRatio`: `0-1`, at most two decimal places, matching the documented
+  formula;
+- `stabilization`: `0-1000`.
+
+`getConfig` returned these fields during discovery:
+
+```text
+currentDate, day, month, year, syncRatio, stabilization,
+condition, fluxDensity, batteryStatus, PTA, PTB, PWR,
+mode, internalMode
+```
+
+After a complete date is set, both the final `configure` response and later
+`getConfig` responses include `needConfig` until the correct stabilization is
+submitted. The observed hint is semantic input, not a ready numeric value.
+The model may extract the operands and operation, but ordinary Python must
+calculate the result and enforce the `0-1000` range.
+
+### Flux And Internal Mode
+
+For the correctly configured 2238 backend target, discovery observed:
+
+| State | Flux Density | Condition |
+| --- | ---: | --- |
+| Complete date only | 0% | `unstable` |
+| Correct `syncRatio` | 20% | `unstable` |
+| Correct stabilization, wrong internal mode | 40% | `stable` |
+| Correct stabilization and `internalMode = 3` | 60% | `stable` |
+
+`condition = stable` is therefore necessary but not sufficient for activation.
+The supervisor must validate Flux Density and `internalMode` separately.
+
+Twelve timed `getConfig` samples observed the sequence `1 → 2 → 3 → 4`, with
+approximately five seconds per mode. A fixed sleep would remain brittle. The
+runtime should poll for a fresh matching snapshot and bind it to a short-lived
+activation lease.
+
+The complete sanitized exploration summary is stored at
+`data/L25_timetravel/output/api_exploration/summary.json`.
+
+## UI Exploration Results
+
+Live UI exploration authenticated successfully and exercised the manual
+controls in headless Edge. The test changed only reversible browser-owned
+state. It did not click the activation sphere, send a `timeTravel` request,
+use `reset`, consume battery, or change the configured target date.
+
+### Authentication Contract
+
+The preview does not accept a fresh unauthenticated browser directly. The
+observed login sequence is:
+
+1. Open `https://hub.ag3nts.org/timetravel_preview`.
+2. Follow the protected-page redirect to `cart.easy.tools/brave/login`.
+3. Open the Easytools login link, which continues on `id.easy.tools`.
+4. Explicitly select **Hasło**. The default mode is a magic link, even though
+   a password field exists in the DOM.
+5. Fill the email and password from `.env` and submit.
+6. Require the final location to be the approved Hub preview path.
+
+The browser runtime must allow only these main-frame hosts during login:
+
+```text
+hub.ag3nts.org
+cart.easy.tools
+id.easy.tools
+```
+
+Every run should use a fresh browser context. Playwright storage state must
+not be persisted because it contains reusable authentication material. The
+login helper owns credentials; neither the Frontend Agent nor the model sees
+their values. Captured artifacts contain cookie names and storage keys only,
+never cookie values.
+
+### Stable DOM Contract
+
+Normal operation can use deterministic DOM state. Visual interpretation is
+not needed unless the page contract changes.
+
+| Machine value | Selector | Read or write contract |
+| --- | --- | --- |
+| `PT-A` | `#portA` | Read `aria-checked`; click to toggle. |
+| `PT-B` | `#portB` | Read `aria-checked`; click to toggle. |
+| `standby` / `active` | `#mainSwitch` | Read `aria-checked`; click to toggle; confirm text through `#switchLabel`. |
+| `PWR` | `#pwrSlider` | Read the range value; set it through a normal range interaction; confirm through `#pwrVal`. |
+| Target date | `.field-day`, `.field-month`, `.field-year` | Read the three displayed input values. |
+| Current location | `#currentDateVal` | Read the server-provided date text. |
+| Flux Density | `#fluxPct` | Parse the displayed percentage. |
+| Sync Ratio | `#syncPct` | Parse the displayed percentage. |
+| Device condition | `#condLabel` | Read text and the `stable` or `unstable` class. |
+| `internalMode` | `.imode-dot.lit` | Read the active dot's `data-m` value. |
+| Battery | `#batteryIndicator` | Read `level-N` or `dead` and count `.battery-cell.charged`. |
+| Activation sphere | `#orb` | Ready only when `powered` is present and `danger` is absent. |
+| Same-date warning | `#sameDateMsg` | Inspect the `visible` class. |
+| Transient error | `#deviceToast` | Inspect the `visible` class and text. |
+| Final flag | `#flagOverlay`, `#flagText` | Require a visible overlay and non-empty flag text. |
+
+The preview polls `/timetravel_backend` every two seconds in a visible tab and
+every eight seconds in a hidden tab. Manual control changes use `POST
+/timetravel_backend`; activation alone uses `POST /verify` with the
+`timeTravel` action. Recently changed controls remain locally protected from
+poll overwrites for four seconds, so the Frontend Agent must verify both the
+immediate DOM update and the server-persisted value after a later poll or
+reload.
+
+### Reversible Live Test
+
+The safe live test started with the backend already configured for November
+5, 2238 and the browser controls restored to `PT-A = off`, `PT-B = off`,
+`PWR = 0`, and `standby`.
+
+The test then observed:
+
+| State | PT-A | PT-B | PWR | Mode | Internal mode | Flux | Sphere |
+| --- | --- | --- | ---: | --- | ---: | ---: | --- |
+| Initial safe state | Off | Off | 0 | Standby | 2 | 40% | `danger`, not powered |
+| Prepared battery jump | Off | On | 91 | Standby | 3 | 100% | Not dangerous, not powered |
+| Activation-ready observation | Off | On | 91 | Active | 3 | 100% | `powered`, not `danger` |
+| Restored state | Off | Off | 0 | Standby | 4 | 40% | `danger`, not powered |
+
+`PT-B = on` and `PWR = 91` persisted after a full preview reload. The active
+state produced the expected ready sphere, but the sphere was deliberately not
+clicked. Network evidence contained no `POST /verify`. The final safe state
+also survived a reload.
+
+The page contract shows how consequential outcomes will appear without
+requiring a discovery activation:
+
+- successful travel returns domain code `13`, applies the returned config,
+  and clears the target-date inputs;
+- the current location is rendered through `#currentDateVal`;
+- battery replacement is reflected by `#batteryIndicator`;
+- errors appear in `#deviceToast`;
+- a final flag is rendered in `#flagOverlay` and `#flagText`.
+
+These signals define the reconciliation contract, but actual arrival, battery
+replacement, tunnel completion, and flag delivery remain untested until the
+guarded end-to-end run. A timeout after a sphere click remains ambiguous and
+must never trigger a blind second click.
+
+The sanitized discovery summary is stored at
+`data/L25_timetravel/output/ui_exploration/summary.json`.
 
 ## Deterministic Safety Boundary
 
@@ -283,9 +465,11 @@ Activation uses a two-sided readiness barrier:
    activating.
 6. An expired or already consumed lease cannot be reused.
 
-The acceptable snapshot age and lease duration will be chosen after API and UI
-discovery reveals the actual `internalMode` rotation timing and browser
-latency.
+Discovery observed roughly five seconds per `internalMode` and a two-second
+foreground UI poll. The lease must therefore be shorter than the remaining
+mode window, and the activation tool must re-read the DOM immediately before
+clicking. The exact snapshot-age and lease constants remain implementation
+settings to be fixed by timing tests, not values the model may choose.
 
 ### Non-Idempotent Activation
 
@@ -353,31 +537,30 @@ and synchronization strategy must be reviewed before changing this boundary.
 
 ## Browser Automation
 
-The planned browser runtime is Python Playwright controlling the locally
+The browser runtime is planned as Python Playwright controlling the locally
 installed Microsoft Edge through the `msedge` channel.
 
 Current environment findings:
 
 - Microsoft Edge is installed;
-- Playwright is not installed in `venv`;
+- Playwright 1.61.0 is installed in `venv`;
+- headless Edge 150.0.4078.65 authenticated to and operated the live preview
+  successfully through `channel="msedge"`;
 - Selenium is not installed and is not planned;
 - using installed Edge should avoid a separate Chromium download;
 - bundled Chromium remains a fallback if Edge launch or policy compatibility
   fails.
 
-The UI discovery stage must identify and verify:
-
-- the preview's authentication or session-binding behavior;
-- stable accessible names or selectors for all controls;
-- actual control value formats;
-- how the machine exposes `Flux Density`, condition, mode, and battery state;
-- the exact activation sphere readiness signal;
-- visible arrival, battery replacement, tunnel, error, and flag outcomes;
-- whether headless Edge behaves the same as headed Edge.
+Each run opens a fresh context, authenticates through the three approved
+hosts, and closes the context without exporting storage state. The normal
+control path uses the stable selectors recorded in UI discovery and verifies
+that updates persist after the preview poll. A domain guard must reject any
+unexpected main-frame destination.
 
 The Frontend Agent should use DOM and accessibility state first. Screenshots or
 model-based visual interpretation are diagnostic fallbacks for ambiguous or
-changed page structure, not the normal control path.
+changed page structure, not the normal control path. The successful headless
+test means headed Edge is not required for the first implementation.
 
 ## LLM Usage And Reviews
 
@@ -389,7 +572,8 @@ changed page structure, not the normal control path.
 
 Planned model responsibilities:
 
-- interpret potentially variable API help and stabilization hints;
+- extract structured operands and operations from the natural-language
+  stabilization hint;
 - select the next permitted tool inside the agent's current phase;
 - interpret bounded browser state when deterministic extraction is ambiguous;
 - classify recoverable API or UI failures;
@@ -397,7 +581,7 @@ Planned model responsibilities:
 
 Deterministic Python remains responsible for:
 
-- arithmetic and date validation;
+- stabilization arithmetic and date validation;
 - PWR and mode lookup;
 - phase transitions;
 - permissions and tool exposure;
@@ -415,12 +599,13 @@ may be implemented until the design review passes.
 
 ## Configuration
 
-The exact configuration contract will be finalized after API and UI discovery.
-The planned boundary is:
+The observed configuration boundary is:
 
 | Setting | Purpose | Secret |
 | --- | --- | --- |
 | `AI_DEVS_API_KEY` | Authenticate Hub requests. | Yes |
+| `EASYTOOLS_EMAIL` | Authenticate the fresh preview browser context. | Yes |
+| `EASYTOOLS_PASSWORD` | Authenticate the fresh preview browser context in password mode. | Yes |
 | `OPENAI_API_KEY` | Run the two OpenAI agent loops. | Yes |
 | `HUB_VERIFY_URL` | Approved Hub API endpoint supplied at runtime. | Operational value |
 | `TIMETRAVEL_PREVIEW_URL` | Approved browser origin supplied at runtime. | Operational value |
@@ -440,6 +625,10 @@ Planned repository-root-relative paths:
 | Path | Purpose |
 | --- | --- |
 | `data/L25_timetravel/input/timetravel.md` | Authoritative machine documentation. |
+| `data/L25_timetravel/output/api_exploration/summary.json` | Sanitized API contract and discovery conclusions. |
+| `data/L25_timetravel/output/api_exploration/*.json` | Full masked request and Hub response evidence from guarded discovery. |
+| `data/L25_timetravel/output/ui_exploration/summary.json` | Sanitized authentication, selector, readiness, and control-persistence contract. |
+| `data/L25_timetravel/output/ui_exploration/{timestamp}/` | Bounded DOM, accessibility, network-metadata, and screenshot evidence from guarded UI discovery. |
 | `data/L25_timetravel/runs/{run_id}/coordination.sqlite3` | Durable workflow and agent coordination state. |
 | `data/L25_timetravel/runs/{run_id}/screenshots/` | Bounded UI evidence captured for important failures or outcomes. |
 | `data/L25_timetravel/runs/{run_id}/browser/` | Sanitized DOM or accessibility snapshots needed for diagnostics. |
@@ -461,13 +650,13 @@ The planned entrypoint is:
 ```
 
 A future live mode must be explicit because it controls external state. The
-exact command contract will be documented only after API and UI exploration
-establish the real behavior.
+exact command contract will be documented after the design review and source
+implementation establish the available dry-run and live safety guards.
 
 ## Planned Main Modules
 
-Module names are provisional until the implementation plan is written in
-DEV_NOTES.
+The implementation order and checkpoints are defined in
+`src/apps/L25_timetravel/docs/L25_timetravel_DEV_NOTES.md`.
 
 | Module | Planned responsibility |
 | --- | --- |
@@ -515,10 +704,16 @@ Implementation is expected to prove behavior in layers:
    - invalid model action rejection;
    - bounded recovery;
    - no direct completion claims.
-6. **Read-only live smoke checks**
-   - Hub help and configuration inspection;
-   - Edge launch and preview inspection;
-   - no activation.
+6. **Live discovery checks**
+   - Hub help, configuration, stabilization, validation, and mode sampling:
+     completed without activation or reset;
+   - Easytools password login in a fresh headless Edge context: completed;
+   - preview DOM and accessibility inspection: completed;
+   - reversible `PT-B`, `PWR`, and `active`/`standby` control test:
+     completed, persisted after reload, and restored safely;
+   - activation requests observed during discovery: zero;
+   - secret scan across UI artifacts: passed with zero matches for the three
+     configured credential values;
 7. **Guarded end-to-end run**
    - three verified legs;
    - no blind activation retry;
@@ -530,29 +725,27 @@ execution remain separate approval gates.
 
 ## Open Questions
 
-API exploration must answer:
+Remaining API questions:
 
-- the complete `help` response contract;
-- the exact `getConfig` schema in every machine state;
-- stabilization hint wording and valid value range;
 - whether `getConfig` is safe and available while the machine is `active`;
-- whether the API exposes server time or an authoritative present date;
-- how battery replacement and travel outcomes appear in backend state;
-- the exact consequences of `reset` after partial progress;
-- transient failure and rate-limit behavior.
+- the exact backend state transition after successful travel and battery
+  replacement;
+- the exact consequences of `reset` after partial progress or battery
+  replacement;
+- whether active-mode configuration errors introduce a distinct domain code.
 
-UI exploration must answer:
+Remaining consequential UI questions can be answered only during the guarded
+end-to-end run:
 
-- how preview state is associated with the course API key or session;
-- stable selectors for all controls and observations;
-- whether control changes are immediately persisted;
-- whether the UI exposes `internalMode` independently;
-- whether `Flux Density`, condition, and sphere color can be read from DOM
-  state rather than pixels;
-- how arrival, battery replacement, tunnel success, and the flag are exposed;
-- whether headless Edge is sufficient;
-- how to distinguish a timed-out activation from an activation that actually
-  succeeded.
+- the live arrival transition after domain code `13`;
+- the observed battery replacement in 2238;
+- the final tunnel and flag payload;
+- the exact evidence needed to prove whether a timed-out activation happened.
+
+Reset remains intentionally untested because discovering its behavior could
+destroy valid progress. The implementation must reconcile `currentDate`,
+battery, target fields, toast, flag overlay, and the backend snapshot after an
+ambiguous activation before any retry is even considered.
 
 Discovery results may change tool contracts, timing limits, or validation
 details. Any larger architecture or data-flow change requires explicit review
@@ -563,9 +756,8 @@ before implementation.
 | Step | Scope | Status |
 | ---: | --- | --- |
 | 1 | Create README with the accepted design. | Complete |
-| 2 | Install missing packages and update `requirements.txt`. | Pending approval and execution |
-| 3 | Explore the Hub API. | Pending |
-| 4 | Explore the preview UI. | Pending |
-| 5 | Update README with observed contracts and decisions. | Pending |
-| 6 | Create DEV_NOTES with the batch-based implementation plan. | Pending |
-
+| 2 | Install missing packages and update `requirements.txt`. | Complete |
+| 3 | Explore the Hub API. | Complete for safe scope |
+| 4 | Explore the preview UI. | Complete for non-activating scope |
+| 5 | Update README with observed contracts and decisions. | Complete |
+| 6 | Create DEV_NOTES with the batch-based implementation plan. | Complete |
