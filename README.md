@@ -1,8 +1,8 @@
 # AI_devs
 
-Python-based solutions and experiments developed during the AI_devs AI engineering course.
+Python-based solutions and experiments developed while completing the AI_devs AI engineering course.
 
-This repository is both a learning workspace and a portfolio of applied AI engineering practice. Its goal is not only to pass course assignments, but also to explore how AI-powered applications can be designed, implemented, documented, reviewed, and operated in a way that is closer to production software than to one-off scripts.
+This repository contains the complete set of 25 course task applications, from `L1` through `L25`. It is both a record of the completed learning journey and a portfolio of applied AI engineering practice. The work went beyond passing course assignments to explore how AI-powered applications can be designed, implemented, documented, reviewed, and operated in a way that is closer to production software than to one-off scripts.
 
 ## Table Of Contents
 
@@ -30,13 +30,13 @@ Applications created to solve AI_devs course tasks are located in the `src/apps/
 
 The repository also includes applications labeled as `EDU#`. These are not direct course tasks, but rather educational side projects and author experiments. They were usually created as simplified, focused exercises to better understand a specific concept, mechanism, or implementation detail when a topic needed additional hands-on practice.
 
-Application documentation is kept close to the code in each app's `docs/` directory. README files describe the current purpose, workflow, configuration, run command, module structure, and verification approach for an app. Some apps also include DEV_NOTES files with working context such as implementation history, debugging lessons, trade-offs, open questions, future work, and lessons learned.
+Application documentation is kept close to the code, usually in a `docs/` directory within the relevant application or implementation variant. README files describe the current purpose, workflow, configuration, run command, module structure, and verification approach for an app. Some apps also include DEV_NOTES files with working context such as implementation history, debugging lessons, trade-offs, open questions, future work, and lessons learned.
 
 Runtime data, generated outputs, logs, cache files, downloaded references, and similar artifacts are intentionally kept outside application source directories whenever practical, usually under the repository-level `data/` directory. This keeps application code focused on implementation and documentation, while runtime artifacts remain separated by purpose.
 
 ## Applications
 
-Course task applications:
+Completed course task applications:
 
 - [`L1_people`](src/apps/L1_people/)
 - [`L2_findhim`](src/apps/L2_findhim/)
@@ -62,6 +62,7 @@ Course task applications:
 - [`L22_phonecall`](src/apps/L22_phonecall/)
 - [`L23_shellaccess`](src/apps/L23_shellaccess/)
 - [`L24_goingthere`](src/apps/L24_goingthere/)
+- [`L25_timetravel`](src/apps/L25_timetravel/)
 
 Educational side applications:
 
