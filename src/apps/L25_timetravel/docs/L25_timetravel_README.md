@@ -1,13 +1,14 @@
 # L25 Timetravel
 
-Planned autonomous solution for the AI_devs `timetravel` task. Two separate
-AI agents will operate the Hub API and the browser preview, while ordinary
-Python will own workflow state, safety rules, calculations, and permission to
-activate the time machine.
+Autonomous solution for the AI_devs `timetravel` task. Two separate AI agents
+operate the Hub API and the browser preview, while ordinary Python owns
+workflow state, safety rules, calculations, and permission to activate the
+time machine.
 
-The application has completed safe API and UI discovery. It has no runnable
-source implementation yet; the LLM design review is the next implementation
-gate.
+The application completed API and UI discovery, offline simulation, bounded
+model evaluation, and one guarded live run on July 18, 2026. The live workflow
+finished all three travel legs with exactly one activation per leg and the Hub
+accepted the result (`flag_found: true`).
 
 ## Table Of Contents
 
@@ -27,10 +28,11 @@ gate.
 - [Configuration](#configuration)
 - [Runtime Data](#runtime-data)
 - [Run](#run)
-- [Planned Main Modules](#planned-main-modules)
-- [Verification Plan](#verification-plan)
-- [Open Questions](#open-questions)
-- [Delivery Steps](#delivery-steps)
+- [Main Modules](#main-modules)
+- [Verification](#verification)
+- [Limitations And Follow-Ups](#limitations-and-follow-ups)
+- [Completion Record](#completion-record)
+- [What This Task Should Teach](#what-this-task-should-teach)
 
 ## Purpose
 
@@ -55,22 +57,22 @@ The machine documentation at
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Architecture | Accepted for documentation | Two narrow AI agents plus one deterministic supervisor. |
-| App README | Current through API and UI discovery | The design and both observed external contracts are documented. |
-| Python source | Not started | Source implementation is blocked until the LLM design review passes. |
+| Architecture | Implemented | Two narrow AI agents plus one deterministic supervisor in a single CLI process. |
+| App README | Current | Documents discovery, implementation, verification, and the completed live run. |
+| Python source | Complete for the course task | Dry-run, simulation, model check, and explicit live submission modes are available. |
 | Hub API exploration | Complete for safe scope | Help, configuration, validation, stabilization, and mode rotation were inspected without activation or reset. |
 | Preview UI exploration | Complete for non-activating scope | Authentication, DOM selectors, control persistence, readiness signals, and safe restoration were verified without travel or reset. |
-| SQLite | Available | Python 3.11 includes `sqlite3`; local SQLite version observed as 3.45.1. |
-| Browser library | Available | Playwright 1.61.0 is installed in the project virtual environment. |
-| Browser engine | Verified against the live preview | Headless Microsoft Edge 150.0.4078.65 authenticated, operated the controls, and restored state successfully. |
+| Offline verification | Passed | The fake machine completed three legs, three activations, and terminal phase `COMPLETED` without network access. |
+| Model boundary evaluation | Passed | Four bounded schema cases passed: two stabilization hints and two frontend decisions. |
+| Guarded live run | Solved | Run `20260718T113838Z` completed three activations, used 34 Hub requests, and persisted `flag_found: true`. |
+| Browser engine | Verified live | Headless Microsoft Edge authenticated, controlled the preview, and captured final evidence. |
 
-The final application can operate the preview through standalone Python
-Playwright even though the in-app Codex browser was unavailable during early
-design discovery. The live smoke test and reversible control test both passed.
+The final application operates the preview through standalone Python
+Playwright. The in-app Codex browser is not part of the runtime contract.
 
 ## Architecture
 
-The application will use a hybrid multi-agent architecture:
+The application uses a hybrid multi-agent architecture:
 
 - the **Backend Agent** controls the Hub API;
 - the **Frontend Agent** controls the browser preview;
@@ -78,15 +80,18 @@ The application will use a hybrid multi-agent architecture:
   checks;
 - SQLite is the durable coordination blackboard shared by all three roles.
 
-The recommended first implementation uses one CLI process containing two
-independent agent loops and one supervisor task. The agents remain separate
+The implementation uses one CLI process containing two independent agent
+boundaries and one supervisor. The agents remain separate
 because they have different prompts, histories, permissions, and tool sets.
-Separate operating-system processes are unnecessary for the first version and
+Separate operating-system processes are unnecessary for this local workflow and
 would add avoidable browser lifecycle and OneDrive file-locking complexity.
 
-Agents do not send free-form messages directly to one another. They exchange
-validated commands and observations through SQLite. The supervisor remains
-the only authority allowed to advance the workflow or authorize activation.
+Agents do not send free-form messages directly to one another. The Supervisor
+calls their bounded methods sequentially and persists authoritative phases,
+observations, events, and activation leases in SQLite. The current live path
+does not use the queued-command and resume helpers already present in the
+coordination store. The Supervisor remains the only authority allowed to
+advance the workflow or authorize activation.
 
 Live API discovery confirmed that `getConfig` also reports browser-owned
 values such as `PTA`, `PTB`, `PWR`, and `mode`. The Backend Agent can therefore
@@ -175,7 +180,7 @@ itself.
 1. Start one run and freeze the server-authoritative `currentDate` returned by
    `getConfig`. Use the `Europe/Warsaw` local date only if that field is missing
    or invalid.
-2. Load and validate the machine rules required for the three planned target
+2. Load and validate the machine rules required for the three travel target
    years.
 3. Request API help and inspect the current backend configuration.
 4. Inspect the preview without changing consequential state and reconcile both
@@ -202,7 +207,7 @@ itself.
 13. Mark the run `completed` only after the tunnel outcome is verified and the
     course flag is found.
 
-Planned workflow phases:
+Runtime workflow phases:
 
 ```text
 BOOTSTRAP
@@ -285,7 +290,7 @@ complete target dates have been configured.
 ## API Exploration Results
 
 The safe live exploration used 25 guarded Hub requests. It configured the
-backend for the first planned target but did not use `reset`, activate the
+backend for the first travel target but did not use `reset`, activate the
 machine, change browser controls, consume battery, or attempt a tunnel.
 
 ### Response Contract
@@ -356,7 +361,7 @@ use `reset`, consume battery, or change the configured target date.
 The preview does not accept a fresh unauthenticated browser directly. The
 observed login sequence is:
 
-1. Open `https://hub.ag3nts.org/timetravel_preview`.
+1. Open the approved `TIMETRAVEL_PREVIEW_URL`.
 2. Follow the protected-page redirect to `cart.easy.tools/brave/login`.
 3. Open the Easytools login link, which continues on `id.easy.tools`.
 4. Explicitly select **Hasło**. The default mode is a magic link, even though
@@ -439,10 +444,10 @@ requiring a discovery activation:
 - errors appear in `#deviceToast`;
 - a final flag is rendered in `#flagOverlay` and `#flagText`.
 
-These signals define the reconciliation contract, but actual arrival, battery
-replacement, tunnel completion, and flag delivery remain untested until the
-guarded end-to-end run. A timeout after a sphere click remains ambiguous and
-must never trigger a blind second click.
+The guarded end-to-end run later confirmed this contract for arrival, battery
+replacement, return, tunnel completion, and flag delivery. All three
+activations returned domain code `13`. A timeout after a sphere click remains
+ambiguous and must never trigger a blind second click.
 
 The sanitized discovery summary is stored at
 `data/L25_timetravel/output/ui_exploration/summary.json`.
@@ -466,17 +471,16 @@ Activation uses a two-sided readiness barrier:
 6. An expired or already consumed lease cannot be reused.
 
 Discovery observed roughly five seconds per `internalMode` and a two-second
-foreground UI poll. The lease must therefore be shorter than the remaining
-mode window, and the activation tool must re-read the DOM immediately before
-clicking. The exact snapshot-age and lease constants remain implementation
-settings to be fixed by timing tests, not values the model may choose.
+foreground UI poll. Runtime constants therefore limit snapshot age to 1.25
+seconds and the one-time activation lease to 1.5 seconds. The activation tool
+re-reads the DOM immediately before clicking; neither value is model-controlled.
 
 ### Non-Idempotent Activation
 
 Activation must never be retried blindly. If a click or response times out,
-both agents first inspect the machine to determine whether travel already
-occurred. A second click is permitted only after reconciliation proves that the
-first activation did not happen.
+the run is persisted as `BLOCKED`. The current implementation does not issue a
+second lease automatically, even if later inspection suggests that travel did
+not occur.
 
 ### Reset Policy
 
@@ -506,7 +510,7 @@ module.
 Agents do not receive raw SQL access. Each role uses a narrow repository
 adapter that exposes only its permitted operations.
 
-### Planned Tables
+### Tables
 
 | Table | Writer | Purpose |
 | --- | --- | --- |
@@ -530,54 +534,53 @@ adapter that exposes only its permitted operations.
 - The first version uses one process and serialized database access rather than
   multiple writers in separate processes.
 
-The repository is stored in a OneDrive-synchronized path. The first version
-should therefore avoid a long-lived multi-process WAL design. If later testing
+The repository is stored in a OneDrive-synchronized path. The implementation
+therefore avoids a long-lived multi-process WAL design. If later testing
 proves that separate worker processes are valuable, the live database location
 and synchronization strategy must be reviewed before changing this boundary.
 
 ## Browser Automation
 
-The browser runtime is planned as Python Playwright controlling the locally
-installed Microsoft Edge through the `msedge` channel.
+The runtime uses synchronous Playwright with installed Microsoft Edge through
+`channel="msedge"` in headless mode. Each run creates a fresh browser context,
+allows only the Hub and Easytools authentication hosts, and closes the context
+without exporting cookies or storage state.
 
-Current environment findings:
-
-- Microsoft Edge is installed;
-- Playwright 1.61.0 is installed in `venv`;
-- headless Edge 150.0.4078.65 authenticated to and operated the live preview
-  successfully through `channel="msedge"`;
-- Selenium is not installed and is not planned;
-- using installed Edge should avoid a separate Chromium download;
-- bundled Chromium remains a fallback if Edge launch or policy compatibility
-  fails.
-
-Each run opens a fresh context, authenticates through the three approved
-hosts, and closes the context without exporting storage state. The normal
-control path uses the stable selectors recorded in UI discovery and verifies
-that updates persist after the preview poll. A domain guard must reject any
-unexpected main-frame destination.
-
-The Frontend Agent should use DOM and accessibility state first. Screenshots or
-model-based visual interpretation are diagnostic fallbacks for ambiguous or
-changed page structure, not the normal control path. The successful headless
-test means headed Edge is not required for the first implementation.
+The login helper keeps credentials outside model context. It identifies the
+protected-page login link by parsed host, path, and the presence of the
+`redirect` query parameter instead of assuming a fixed query-string order.
+After password login, normal operation uses deterministic DOM and accessibility
+state. Every control mutation is checked immediately and after the preview's
+server poll. Screenshots are bounded runtime evidence, not the normal decision
+surface.
 
 ## LLM Usage And Reviews
 
 | Area | Status | Evidence |
 | --- | --- | --- |
-| LLM usage | Yes | Two tool-using OpenAI agents are planned: one for Hub API interpretation and one for browser operation and bounded recovery. |
-| Design review | Pending | `_agent/instructions/llm_design_checklist.md`; planned scope: full dual-agent L25 workflow; implementation boundary remains closed. |
-| Optimization review | Pending | `_agent/instructions/llm_optimization_checklist.md`; required after the complete LLM workflow is implemented and tested. |
+| LLM usage | Yes | The Backend Agent extracts arithmetic structure from variable stabilization hints; the Frontend Agent proposes one bounded UI action from typed state. |
+| Design review | Passed | `_agent/instructions/llm_design_checklist.md`; 2026-07-18; scope: full dual-agent L25 workflow; mode: non-production; result: PASS; boundary: implement the documented workflow only. |
+| Optimization review | Passed | `_agent/instructions/llm_optimization_checklist.md`; 2026-07-18; scope: completed L25 workbench and live workflow; mode: non-production; result: PASS with accepted workbench limitation; follow-up before production: replace routine frontend action selection with deterministic code to reduce model calls. |
 
-Planned model responsibilities:
+Approved model boundary:
+
+| Agent step | Model purpose | Structured output | Tool boundary |
+| --- | --- | --- | --- |
+| Backend stabilization step | Extract operands and an operator from variable natural-language hints. | `StabilizationExpression`. | No Hub or browser tool is exposed to the model call. |
+| Frontend preparation step | Select the next permitted browser action from the current typed observation. | `FrontendDecision`. | Model output is validated before deterministic browser methods run. |
+
+Both agents use `gpt-5.6-luna` through the OpenAI Responses API with low
+reasoning effort, `store=False`, strict Pydantic outputs, small output limits,
+and separate model-request and tool-step guards. Each call receives only the
+current typed command, compact current observation, relevant last error, and
+the tools permitted for that command. Full chat history, raw SQLite rows,
+credentials, and unrelated discovery artifacts are excluded.
+
+Model responsibilities:
 
 - extract structured operands and operations from the natural-language
   stabilization hint;
-- select the next permitted tool inside the agent's current phase;
-- interpret bounded browser state when deterministic extraction is ambiguous;
-- classify recoverable API or UI failures;
-- propose a recovery using only currently permitted tools.
+- select one permitted preparation action for the current frontend state.
 
 Deterministic Python remains responsible for:
 
@@ -594,8 +597,10 @@ Each model output consumed by code must use a strict Pydantic schema. Schema
 shape alone is insufficient: values must also be checked against the current
 phase, permissions, expected target, and machine rules.
 
-No application source files, model prompts, tools, or agent-loop scaffolding
-may be implemented until the design review passes.
+The model may propose readiness but cannot authorize activation. The
+Supervisor issues the lease, and the guarded browser method consumes it and
+rechecks the DOM immediately before the single click. An ambiguous activation
+blocks the run instead of invoking the model or retrying automatically.
 
 ## Configuration
 
@@ -608,19 +613,19 @@ The observed configuration boundary is:
 | `EASYTOOLS_PASSWORD` | Authenticate the fresh preview browser context in password mode. | Yes |
 | `OPENAI_API_KEY` | Run the two OpenAI agent loops. | Yes |
 | `HUB_VERIFY_URL` | Approved Hub API endpoint supplied at runtime. | Operational value |
-| `TIMETRAVEL_PREVIEW_URL` | Approved browser origin supplied at runtime. | Operational value |
+| `TIMETRAVEL_PREVIEW_URL` or `HUB_BASE_URL` | Build the approved browser preview URL. | Operational value |
 | OpenAI model name | App-level model selection in `config.py`. | No |
 | Request, tool, retry, and timing limits | App-level safety limits in `config.py`. | No |
 
 Secrets must remain in `.env`. They must not appear in SQLite, logs,
 screenshots, README, DEV_NOTES, source code, or command output.
 
-Before any real OpenAI or Hub request, the application must apply the
-repository TLS/CA setup documented in `TROUBLESHOOTING.md`.
+Before any real OpenAI or Hub request, the application applies the repository
+TLS/CA setup documented in `TROUBLESHOOTING.md`.
 
 ## Runtime Data
 
-Planned repository-root-relative paths:
+Repository-root-relative paths:
 
 | Path | Purpose |
 | --- | --- |
@@ -630,9 +635,9 @@ Planned repository-root-relative paths:
 | `data/L25_timetravel/output/ui_exploration/summary.json` | Sanitized authentication, selector, readiness, and control-persistence contract. |
 | `data/L25_timetravel/output/ui_exploration/{timestamp}/` | Bounded DOM, accessibility, network-metadata, and screenshot evidence from guarded UI discovery. |
 | `data/L25_timetravel/runs/{run_id}/coordination.sqlite3` | Durable workflow and agent coordination state. |
-| `data/L25_timetravel/runs/{run_id}/screenshots/` | Bounded UI evidence captured for important failures or outcomes. |
-| `data/L25_timetravel/runs/{run_id}/browser/` | Sanitized DOM or accessibility snapshots needed for diagnostics. |
-| `data/L25_timetravel/runs/{run_id}/run_report.json` | Final machine-readable run status and evidence references. |
+| `data/L25_timetravel/runs/{run_id}/screenshots/` | One bounded screenshot after each confirmed activation. |
+| `data/L25_timetravel/runs/{run_id}/responses/` | Raw course responses for confirmed activations. |
+| `data/L25_timetravel/runs/{run_id}/run_report.json` | Secret-safe run result, Hub exchange metadata, and model usage metadata. |
 | `data/L25_timetravel/logs/` | Masked request metadata and validated event logs when separated from the run database. |
 
 Full course responses and flags may be stored only under
@@ -641,123 +646,109 @@ non-sensitive result such as `flag_found: true` or `Hub accepted`.
 
 ## Run
 
-The application is not runnable yet.
-
-The planned entrypoint is:
+Use the project virtual environment. Default mode is a network-free readiness
+check:
 
 ```powershell
 .\venv\Scripts\python.exe -m src.apps.L25_timetravel.main
 ```
 
-A future live mode must be explicit because it controls external state. The
-exact command contract will be documented after the design review and source
-implementation establish the available dry-run and live safety guards.
+Run the complete fake machine without network access:
 
-## Planned Main Modules
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L25_timetravel.main --simulate
+```
 
-The implementation order and checkpoints are defined in
+Run four bounded schema checks against OpenAI without Hub or browser access:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L25_timetravel.main --check-models
+```
+
+Run the consequential live workflow only after explicit approval:
+
+```powershell
+.\venv\Scripts\python.exe -m src.apps.L25_timetravel.main --submit
+```
+
+`--submit` opens an authenticated headless Edge context, calls OpenAI and the
+Hub, mutates shared machine state, and may perform exactly three guarded
+activations. It creates a new run directory before external work begins.
+
+## Main Modules
+
+Development history and review evidence are stored in
 `src/apps/L25_timetravel/docs/L25_timetravel_DEV_NOTES.md`.
 
-| Module | Planned responsibility |
+| Module | Responsibility |
 | --- | --- |
 | `config.py` | Environment loading, normal settings, paths, limits, and TLS setup. |
 | `models.py` | Strict commands, observations, machine snapshots, phases, and terminal results. |
 | `machine_spec.py` | Deterministic machine rules, documentation-derived lookup data, and temporal ratio calculation. |
 | `coordination.py` | SQLite schema, role-scoped repositories, transactions, versions, and leases. |
 | `hub_client.py` | Guarded and masked `timetravel` Hub requests. |
-| `backend_agent.py` | Narrow backend agent loop and API tools. |
+| `llm_gateway.py` | Two independently guarded OpenAI boundaries with strict structured outputs. |
+| `backend_agent.py` | Backend configuration and stabilization-hint interpretation. |
 | `browser_tools.py` | Deterministic Playwright operations and UI validation. |
-| `frontend_agent.py` | Narrow frontend agent loop and bounded browser recovery. |
+| `frontend_agent.py` | Bounded model-guided frontend preparation. |
 | `supervisor.py` | Workflow state machine, readiness barrier, reconciliation, and completion guard. |
-| `run_log.py` | Sanitized artifacts, evidence references, and final run report. |
+| `offline_simulation.py` | Complete network-free fake machine and three-leg workflow. |
+| `evaluation.py` | Four bounded real-model schema checks. |
 | `main.py` | CLI startup, dependency checks, agent lifecycle, and shutdown. |
 
-## Verification Plan
+## Verification
 
-Implementation is expected to prove behavior in layers:
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Default dry-run | Passed | Network disabled; machine table loaded for 1,000 supported years. |
+| Offline simulation | Passed | Three legs, three fake activations, `flag_found: true`, and phase `COMPLETED`. |
+| Bounded model evaluation | Passed | Two arithmetic extractions and two frontend decisions passed in `model_evaluation_20260718T111453Z.json`. |
+| Guarded live run | Solved | Run `20260718T113838Z`; three confirmed activations, 34 Hub requests, and `flag_found: true`. |
+| Final response and UI evidence | Passed | The third response returned domain code `13`; the final screenshot displayed a non-empty flag overlay. |
+| Post-run leak check | Passed | No exact secret or selected short secret-derived marker appeared in the changed source file. |
 
-1. **Specification tests**
-   - temporal ratio examples;
-   - PWR lookup for 2024, the frozen present year, and 2238;
-   - `internalMode` boundaries;
-   - tunnel battery threshold.
-2. **SQLite tests**
-   - role ownership;
-   - atomic command claiming;
-   - stale-version rejection;
-   - lease expiration and one-time consumption;
-   - crash-safe resume state.
-3. **Backend tests with fake responses**
-   - standby enforcement;
-   - full date before stabilization lookup;
-   - structured hint interpretation;
-   - request and retry guards;
-   - secret masking.
-4. **Frontend tests against a controlled fixture page**
-   - selector and accessibility behavior;
-   - control verification;
-   - readiness extraction;
-   - domain restriction;
-   - activation lease enforcement.
-5. **Agent tests with fake models and fake tools**
-   - tool separation;
-   - invalid model action rejection;
-   - bounded recovery;
-   - no direct completion claims.
-6. **Live discovery checks**
-   - Hub help, configuration, stabilization, validation, and mode sampling:
-     completed without activation or reset;
-   - Easytools password login in a fresh headless Edge context: completed;
-   - preview DOM and accessibility inspection: completed;
-   - reversible `PT-B`, `PWR`, and `active`/`standby` control test:
-     completed, persisted after reload, and restored safely;
-   - activation requests observed during discovery: zero;
-   - secret scan across UI artifacts: passed with zero matches for the three
-     configured credential values;
-7. **Guarded end-to-end run**
-   - three verified legs;
-   - no blind activation retry;
-   - complete audit trail;
-   - final accepted result.
+The live report and raw course evidence are intentionally kept under
+`data/L25_timetravel/runs/20260718T113838Z/`. The raw flag is not duplicated in
+this documentation.
 
-Real API calls, browser mutations, dependency installation, and final live
-execution remain separate approval gates.
+## Limitations And Follow-Ups
 
-## Open Questions
+- The SQLite schema contains command-queue and heartbeat helpers, but the live
+  CLI executes sequentially and does not expose `--resume`.
+- There is no dedicated `tests/L25_timetravel/` suite; the current automated
+  proof is the complete offline simulation plus the bounded model evaluation.
+- The Frontend Agent used 14 model calls during the solved run. Its routine
+  ports/PWR/mode decisions could be deterministic; retaining the model is an
+  accepted learning-workbench trade-off, not a production optimization.
+- `reset` remains intentionally untested and unavailable to normal agent
+  operation because it may destroy useful machine progress.
+- A host-side command timeout can hide the final stdout result even after the
+  application safely writes its report. Treat `run_report.json` as the source
+  of truth after an interrupted console wait.
 
-Remaining API questions:
-
-- whether `getConfig` is safe and available while the machine is `active`;
-- the exact backend state transition after successful travel and battery
-  replacement;
-- the exact consequences of `reset` after partial progress or battery
-  replacement;
-- whether active-mode configuration errors introduce a distinct domain code.
-
-Remaining consequential UI questions can be answered only during the guarded
-end-to-end run:
-
-- the live arrival transition after domain code `13`;
-- the observed battery replacement in 2238;
-- the final tunnel and flag payload;
-- the exact evidence needed to prove whether a timed-out activation happened.
-
-Reset remains intentionally untested because discovering its behavior could
-destroy valid progress. The implementation must reconcile `currentDate`,
-battery, target fields, toast, flag overlay, and the backend snapshot after an
-ambiguous activation before any retry is even considered.
-
-Discovery results may change tool contracts, timing limits, or validation
-details. Any larger architecture or data-flow change requires explicit review
-before implementation.
-
-## Delivery Steps
+## Completion Record
 
 | Step | Scope | Status |
 | ---: | --- | --- |
-| 1 | Create README with the accepted design. | Complete |
-| 2 | Install missing packages and update `requirements.txt`. | Complete |
-| 3 | Explore the Hub API. | Complete for safe scope |
-| 4 | Explore the preview UI. | Complete for non-activating scope |
-| 5 | Update README with observed contracts and decisions. | Complete |
-| 6 | Create DEV_NOTES with the batch-based implementation plan. | Complete |
+| 1 | Design, documentation, and LLM design gate. | Complete |
+| 2 | Safe Hub and preview discovery. | Complete |
+| 3 | Deterministic domain, SQLite, Hub, browser, and supervisor implementation. | Complete |
+| 4 | Two bounded OpenAI agent boundaries and structured validation. | Complete |
+| 5 | Offline simulation and real-model evaluation. | Complete |
+| 6 | Guarded three-leg live verification. | Solved |
+| 7 | Optimization review, documentation update, and leak check. | Complete |
+
+## What This Task Should Teach
+
+- A model can interpret language or propose a narrow action, but ordinary code
+  should own arithmetic, permissions, state transitions, and completion.
+- Two control surfaces need a shared readiness barrier. A backend snapshot or
+  a glowing browser control alone is not enough evidence for activation.
+- Non-idempotent actions need one-time authorization and explicit ambiguous
+  outcomes. Retrying a click because stdout timed out is how automation becomes
+  slapstick.
+- Browser selectors should represent semantic contracts. Parsing a login URL
+  by host, path, and query keys is more robust than depending on parameter
+  order inside one CSS substring.
+- Durable runtime evidence matters: the final report proved success even when
+  the surrounding command runner timed out before displaying stdout.
